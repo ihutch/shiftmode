@@ -1,9 +1,9 @@
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 module shiftmode
   ! We use x in place of z, because x is real.
-  integer, parameter :: nx=100, ne=50, nvy=50
+  integer, parameter :: nx=50, ne=50, nvy=50
   real :: xL=29.,Emax=2.,vymax=4.
-  real :: psi=.1,pL=4.,k=.0, Ty=1.
+  real :: psi=.1,pL=4.,k=.0001, Ty=1.
   complex :: omega=(0.,.01)
   integer :: idebug=1
   ! Position arrays
@@ -36,26 +36,27 @@ contains
   subroutine tauxcalc(vinf,omegad)
     ! integrate dx/v to get v(x), tau(x) and Lt(x,t=0)
     real vinf
-    complex omegad,Ltint
+    complex omegad,Ltint,Ltemp
     scalefactor=1.e10
     taustep=alog(scalefactor)/max(imag(omegad),1.e-5)
     tau(1)=0.
     v(1)=sqrt(vinf**2+2.*phi(1))
-    Ltint=(v(1)-vinf)*sqm1
+    Ltint=(v(1)-vinf)*sqm1 ! prior Lt integrand
+    Lt(1)=0.               ! Lt integrated
     phiut(1)=v(1)-vinf
     ! \int_0^tau exp(-i*omegad*tau) dtau to begin with.  
     do i=2,nx
        v(i)=sqrt(vinf**2+2.*phi(i))
-       tau(i)=tau(i-1)+dx*(v(i-1)+v(i))/(v(i-1)*v(i))
-       dtau=(tau(i)-tau(i-1))
+       dtau=dx*0.5*(v(i-1)+v(i))/(v(i-1)*v(i))
+       tau(i)=tau(i-1)+dtau
        if(tau(i).gt.taustep)then  !Rescale to avoid overflow.
           tau(i)=tau(i)-taustep
           Ltint=Ltint*exp(sqm1*omegad*taustep)
 !          write(*,*)'scaletau',i,taustep,tau(i),Ltint
        endif
-       Lt(i)=Ltint
-       Ltint=(v(i)-vinf)*exp(-sqm1*omegad*tau(i))*sqm1
-       Lt(i)=(Lt(i)+Ltint)/2. *dtau
+       Ltemp=Ltint
+       Ltint=(v(i)-vinf)*sqm1*exp(-sqm1*omegad*tau(i))
+       Lt(i)=Lt(i-1)+(Ltemp+Ltint)/2. *dtau
        ! Add accel term and adjust tau at end to t=0.
        phiut(i)=v(i)-vinf+ sqm1*Lt(i)*exp(sqm1*tau(i)*omegad)
     enddo
@@ -121,14 +122,16 @@ contains
     call autoplot(x,real(fte(:,1)),nx)
     call axlabels('','Real(fte)')
     do i=2,ne
-       call color(mod(i-2,14)+1)
+!       call color(mod(i-2,14)+1)
+       call color(i-1)
        call polyline(x,real(fte(:,i)),nx)
     enddo
     call color(15)
     call autoplot(x,imag(fte(:,1)),nx)
     call axlabels('x','Imag(fte)')
     do i=2,ne
-       call color(mod(i-2,14)+1)
+!       call color(mod(i-2,14)+1)
+       call color(i-1)
        call polyline(x,imag(fte(:,i)),nx)
     enddo
     call pltend()
