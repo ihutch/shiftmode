@@ -1,22 +1,23 @@
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 module shiftmode
   ! We use x in place of z, because x is real.
-  integer, parameter :: nx=20, ne=20, nvy=20
+  integer, parameter :: nx=100, ne=50, nvy=50
+  real :: xL=29.,Emax=2.,vymax=4.
+  real :: psi=.1,pL=4.,k=.0, Ty=1.
+  complex :: omega=(0.,.01)
+  integer :: idebug=1
   ! Position arrays
-  real :: dx,k=1
-  real :: x(nx),phi(nx),tau(nx),v(nx)
-  complex :: omega=(0.,0.2),omegad,sqm1=(0.,1.)
+  real :: dx
+  real :: x(nx),phi(nx),phiprime(nx),tau(nx),v(nx),work(nx)
+  complex :: omegad,sqm1=(0.,1.)
   complex :: Lt(nx),phiut(nx),dent(nx),denttemp(nx),priorcontrib(nx)
   complex :: ft1(nx),ft2(nx),ft3(nx),ft1int(nx),ft2int(nx),ft3int(nx)
   ! Energy arrays
-  real :: Emax=4
   real :: de,E(ne),fe0(ne),fe0de(ne)
   complex :: fte(nx,ne)
   ! vy arrays
   real :: vy(nvy),fy(nvy),fywy(nvy)
-  real :: Ty=1.,vymax=4.
-  real :: dvy,xL=30.,psi=.5,pL=4.
-  integer :: idebug=2
+  real :: dvy
 contains
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   subroutine initialize
@@ -24,6 +25,7 @@ contains
     dx=xL*2./(nx-1.)
     x=dx*(/(i-1,i=1,nx)/)-xL
     phi=psi/cosh(x/pL)
+    phiprime=-psi*sinh(x/pL)/cosh(x/pL)**2
     ! vy-arrays
     dvy=vymax*2./(nvy-1.)
     vy=dvy*(/(i-1,i=1,nvy)/)-vymax
@@ -35,23 +37,29 @@ contains
     ! integrate dx/v to get v(x), tau(x) and Lt(x,t=0)
     real vinf
     complex omegad,Ltint
+    scalefactor=1.e10
+    taustep=alog(scalefactor)/max(imag(omegad),1.e-5)
     tau(1)=0.
     v(1)=sqrt(vinf**2+2.*phi(1))
     Ltint=(v(1)-vinf)*sqm1
     phiut(1)=v(1)-vinf
-!    phiut(1)=0.
-!    write(*,*)v(1),vinf,phiut(1)
     ! \int_0^tau exp(-i*omegad*tau) dtau to begin with.  
     do i=2,nx
        v(i)=sqrt(vinf**2+2.*phi(i))
        tau(i)=tau(i-1)+dx*(v(i-1)+v(i))/(v(i-1)*v(i))
+       dtau=(tau(i)-tau(i-1))
+       if(tau(i).gt.taustep)then  !Rescale to avoid overflow.
+          tau(i)=tau(i)-taustep
+          Ltint=Ltint*exp(sqm1*omegad*taustep)
+!          write(*,*)'scaletau',i,taustep,tau(i),Ltint
+       endif
        Lt(i)=Ltint
        Ltint=(v(i)-vinf)*exp(-sqm1*omegad*tau(i))*sqm1
-       Lt(i)=(Lt(i)+Ltint)/2. *(tau(i)-tau(i-1))
+       Lt(i)=(Lt(i)+Ltint)/2. *dtau
        ! Add accel term and adjust tau at end to t=0.
-       phiut(i)=v(i)-vinf+ Lt(i)*exp(sqm1*tau(i)*omegad)
+       phiut(i)=v(i)-vinf+ sqm1*Lt(i)*exp(sqm1*tau(i)*omegad)
     enddo
-
+    
   end subroutine tauxcalc
   !--------------------------------------------
   subroutine ftcalc(vinf,fe,dfe) ! Integrate over vy to get ft-parallel
@@ -61,7 +69,6 @@ contains
     do i=1,nvy
        omegad=omega-k*vy(i)
        call tauxcalc(vinf,omegad) ! Integrate along past orbit.
-       ! Maybe synthesize phiut explicitly here.
        ! Maybe store things as a function of vy in order to reuse.
        ft1=dfe*fy(i)*phiut
        ft2=dfe*fy(i)*vy(i)*phiut
@@ -72,11 +79,10 @@ contains
     enddo
   end subroutine ftcalc
   !--------------------------------------------
-  subroutine dentcalc ! Integrate over energy to get passing n-tilde.
+  subroutine dentcalc ! Integrate over v_parallel to get passing n-tilde.
     ! On the way, calculate the f(x,E) array. Only non-adiabatic.
     vinfmax=sqrt(2.*Emax)
     dvinf=vinfmax/ne
-    priorcontrib=0.
     do i=1,ne
        vinf=i*dvinf
        E(i)=vinf**2/2.
@@ -84,9 +90,9 @@ contains
        fe0de(i)=fe0(i)
        call ftcalc(vinf,fe0(i),fe0de(i))
        ! ftcalc calls tauxcalc which calculates v(nx) for this vinf.
-       fte(:,i)=omega*ft1int+k*(-ft2int+ft3int)*sqm1
+       ! we might wish to store it.
+       fte(:,i)=(omega*ft1int+k*(-ft2int+ft3int))*sqm1
        if(idebug.gt.1)write(*,'(i4,10f8.4)')i,E(i),vinf,fe0(i),omega,k
-
        if(i.eq.1.and.idebug.gt.1)then
           write(*,*)'  i    E(i)   vinf   fe0(i)  omegar  omegai    k'
           write(*,*)'ft1int'
@@ -100,13 +106,52 @@ contains
           write(*,*)'phiut'
           write(*,'(10f8.4)')phiut
        endif
+!       if(i.eq.1)priorcontrib=0.
+       if(i.eq.1)priorcontrib=fte(:,i)*vinf/v
        denttemp=fte(:,i)*vinf/v
-       dent=dent+(priorcontrib+denttemp)*dvinf
+       dent=dent+0.5*(priorcontrib+denttemp)*dvinf
        priorcontrib=denttemp       
     enddo
     ! Must multiply by m_e\Delta to get the non-adiabatic n-tilde.
+    ! Then integrate times d\phi/dx to get the momentum.
   end subroutine dentcalc
-
+  !--------------------------------------------
+  subroutine plotfte
+    call multiframe(2,1,2)
+    call autoplot(x,real(fte(:,1)),nx)
+    call axlabels('','Real(fte)')
+    do i=2,ne
+       call color(mod(i-2,14)+1)
+       call polyline(x,real(fte(:,i)),nx)
+    enddo
+    call color(15)
+    call autoplot(x,imag(fte(:,1)),nx)
+    call axlabels('x','Imag(fte)')
+    do i=2,ne
+       call color(mod(i-2,14)+1)
+       call polyline(x,imag(fte(:,i)),nx)
+    enddo
+    call pltend()
+  end subroutine plotfte
+  !--------------------------------------------
+  subroutine plotdent  
+    call multiframe(3,1,0)
+    call autoplot(x,real(dent),nx)
+    call axis2()
+    call axlabels('','!ER!@(n-tilde)')
+    call autoplot(x,imag(dent),nx)
+    call axis2()
+    call axlabels('','!EI!@(n-tilde)')
+    call autoplot(x,phi,nx)
+    call winset(.true.)
+    call dashset(2)
+    call polyline(x,phiprime+psi/2.,nx)
+    call winset(.false.)
+    call axis2()
+    call axlabels('!Bx!@','!Af!@')
+    call pltend()
+  end subroutine plotdent
+  !--------------------------------------------
 end module shiftmode
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
@@ -115,33 +160,23 @@ program main
   write(*,*)'nx, ne, nvy,   xL,    pL,   omegar,  omegai,     k'
   write(*,'(3i4,5f8.4)')nx,ne,nvy,xL,pL,real(omega),imag(omega),k
   call initialize
-  call tauxcalc(.2,(.2,0.))
   if(idebug.gt.0)then
+     call tauxcalc(.2,(.2,0.))
      write(*,*)'phi'
      write(*,'(10f8.4)')phi
      write(*,*)'v'
      write(*,'(10f8.4)')v
      write(*,*)'tau'
      write(*,'(10f8.3)')tau
-     write(*,*)'Lt'
+     write(*,*)'real(Lt)'
      write(*,'(10f8.4)')real(Lt)
      write(*,*)'fy'
      write(*,'(10f8.4)')fy
   endif
   
   call dentcalc
-  write(*,*)'dent'
-  write(*,'(10f8.4)')dent
+  call plotfte
+  call plotdent
 
-  call multiframe(2,1,2)
-  call autoplot(x,real(dent),nx)
-  call boxtitle('dent real')
-  call autoplot(x,imag(dent),nx)
-  call pltend()
-  
-  
 end program main
 
-! A problem when tau*omegad is large arises for the slowest passing
-! particles leading to a NAN. We need a systematic way to fix this.
-! I think the way is to rescale the tau_0 when tau becomes too large.
