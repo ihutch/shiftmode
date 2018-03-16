@@ -1,9 +1,9 @@
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 module shiftmode
   ! We use x in place of z, because x is real.
-  integer, parameter :: nx=100, ne=50, nvy=50
-  real :: xL=19.,Emax=2.,vymax=4.            ! Hole length, Energy, v_y 
-  real :: psi=.05,pL=4.,k=.01, Ty=1.          ! psi, sech4width, k, Ty
+  integer, parameter :: nx=100, ne=40, nvy=30
+  real :: xL=20.,Emax=4.,vymax=4.            ! Hole length, Energy, v_y 
+  real :: psi=.1,pL=4.,k=.01, Ty=1.          ! psi, sech4width, k, Ty
   real :: beta=-5.                           ! inverse hole parallel temp.
   real :: pi=3.1415926   
   complex :: omega=(0.0,.01)                  ! complex frequency
@@ -41,6 +41,7 @@ contains
     fywy=-fy/Ty                                 ! gradient
     dtaumax=0.
     beta=-1.-(15./16.)*sqrt(pi/psi) 
+      beta=beta*(.8-.9/abs(beta))    ! Ad hoc correction.
   end subroutine initialize
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!  
 !Trapped particle routines. Can only be called after initialization.
@@ -92,6 +93,7 @@ contains
     v=0.
     C=0.
     phiut=0.
+    dtauprior=0.
     ! Integrate to get tau and C(tau)
     v(istart)=sqrt(2.*(phit(istart)+Wj))
     tau(istart)=v(istart)/phitprime(istart) ! To get to v at accel phiprime.
@@ -108,7 +110,12 @@ contains
        Ltemp=Ltint
        Ltint=exp(-sqm1*omegad*tau(i)) ! Current exponential
        vmean=(v(i)+v(i-1))/2.
+!       vmean=2./(1./v(i)+1./v(i-1))  ! makes no difference
        C(i)=C(i-1)-vmean*(Ltint-Ltemp)/(omegad)   ! New integral
+       if(.not.(abs(C(i)).ge.0))then
+         write(*,*)'Ltint infinity', i,Ltint,Ltemp,tau(i)
+!          stop
+       endif
     enddo
     tbb2=tau(iend)+tau(istart)
     tau(iend+1)=tbb2
@@ -122,34 +129,35 @@ contains
     sumfactor=1./(1.-exptb)
     trapforce=0.
     phiut=0.
-!    write(*,*)'omegad,exptb,exptbb2',omegad,exptb,exptbb2
+! Form phiut as omegad*Lt, and the contribution to trapforce as
+! \int sqm1*phitprime*(omega*dfe ...)*phiut  dtau vpsi
     do i=istart,iend
        exptau=exp(sqm1*omegad*tau(i))
        phiut(i)=omegad*exptau*((1.-exptb)*C(i)+(exptb-exptbb2)*Ctbb2) &
             *sumfactor
-       trapforce=trapforce+sqm1*phiut(i)*phitprime(i) &
-            *(omegad*dfe-(omegad-omega)*dfeperp)*dxt
+! The dtau to be applied to this subsequent tau integral. 
+       dtau=tau(i)-tau(i-1)
+       trapforce=trapforce+sqm1*  &
+       (phiut(i)*phitprime(i)+phiut(i-1)*phitprime(i-1))/2. &
+            *(omegad*dfe-(omegad-omega)*dfeperp)*dtau*vpsi
     enddo
     if(idebug.lt.-2)then
-       write(*,*)'istart,xlent,dxt',istart,xlent,dxt
-       write(*,*)'xt'
-       write(*,'(10f8.3)')xt
-       write(*,*)'istart,iend,tbb2,sq2psi',istart,iend,tbb2,sqrt(2.*psi)
-       write(*,*)'sumfactor',sumfactor
+       write(*,'(a,2i3,5f8.3)')'istart,iend,dxt,tbb2,sumfac' &
+            ,istart,iend,dxt,tbb2,sumfactor
        write(*,*)'v'
        write(*,'(10f8.4)')v
        write(*,*)'xt'
        write(*,'(10f8.4)')xt
        write(*,*)'tau'
        write(*,'(10f8.2)')tau
-       write(*,*)'real(C)'
-       write(*,'(10f8.3)')real(C)
+       write(*,*)'imag(C)'
+       write(*,'(10f8.5)')imag(C)
        write(*,*)'real(phiut)'
-       write(*,'(10f8.2)')real(phiut)
+       write(*,'(10f8.5)')real(phiut)
     endif
   end subroutine cxcalc
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!  
-  subroutine FtEint(omegad,Ftotal,dfperpdWperp)
+  subroutine FtEint(omegad,Ftotal,dfperpdWperp,fperp)
   ! Here we need to iterate over fe (trapped). Wj=vpsi^2/2-psi. So
   ! vpsi=sqrt(2(psi+Wj)) We must use cells that fill the Wj range 0 to
   ! -psi.  Equal W steps are best.
@@ -160,15 +168,16 @@ contains
        write(*,*)'FtEint',omegad,beta,dfperpdWperp
        write(*,*)'  vpsi   fe*s2pi            Ftrap       ' &
          ,'       tb     dvpsi    dFtotal'
-       call pltinit(-8.,8.,-8.,8.)
+       call pltinit(-12.,12.,-8.,8.)
        call axis()
     endif
     iwpow=2         ! Equal W spacing ipow=1
     do i=1,ne
        Wj=psi*(-((i-0.5)/ne)**iwpow)
        fe=exp(-beta*Wj)/sqrt(2.*pi) ! Normalized f_\parallel
-       dfe=-beta*fe                 ! df_||/dW_||
-       dfeperp=dfperpdWperp*fe      ! df/dW_perp
+       dfe=-beta*fe*fperp           ! df_||/dW_||
+!       dfe=-beta*fe           ! df_||/dW_|| old error
+       dfeperp=fe*dfperpdWperp      ! df/dW_perp
        vpsi=sqrt(2.*(psi+Wj))
        dvpsi=-sqrt(2.*psi*(1.-(float(i)/ne)**iwpow)) &
             +sqrt(2.*psi*(1.-(float(i-1)/ne)**iwpow))
@@ -182,10 +191,12 @@ contains
 !             call autoplot(xt,real(phiut),nx)
           else
              call cyccolor(i,14)
-             call polyline(xt,10.*v+2.,nx)
-!             call polyline(xt,real(C),nx)
-             call polyline(xt,imag(phiut),nx)
-             call polyline(xt,real(phiut)-4.,nx)
+             call polyline(xt,10.*v-8.,nx)
+!             call polyline(xt,10.*sqrt(2.*phit)-7.8,nx)
+             call polyline(xt,0.1*imag(C),nx)
+!             call polyline(xt,imag(phiut),nx)
+             call polyline(xt,30.*real(phiut)+4.,nx)
+!             call polyline(-xt,-30.*real(phiut)-4.,nx)
              if(maxval(abs(real(phiut))).gt.3.)then
 !                write(*,'(10f8.4)'),real(phiut)
                 idb=idebug
@@ -196,12 +207,19 @@ contains
           endif
 !          call legendline(-0.4,1-i*.05,258,string)
        endif
+       if(.not.(abs(Ftrap(i)).ge.0))then
+          write(*,*)'Ftrap NAN?',Ftrap(i),Wj,dfe,dfeperp,vpsi,dvpsi
+          stop
+       endif
+
        if(idebug.eq.-2)then
           write(*,'(2f8.4,a,2es12.4,a,f8.3,f9.5,es12.4)')vpsi&
                ,fe*sqrt(2.*pi) &
                ,' (',Ftrap(i),')',tbe(i),dvpsi,real(Ftrap(i))*dvpsi
        endif
-       Ftotal=Ftotal+Ftrap(i)*vpsi*dvpsi  ! Add to Ftotal integral. 
+       Ftotal=Ftotal+2.*Ftrap(i)*dvpsi  ! Add to Ftotal integral. 
+       ! Here we do not multiply by vpsi because that was done in cxcalc.
+       ! But we multiply by 2. to account for \pm v_\psi.
     enddo
     if(idebug.eq.-2)then 
        call pltend()
@@ -212,14 +230,12 @@ contains
   !--------------------------------------------
   subroutine FtVyint()
     ! Integrate (histogram) over vy to get the three ft terms.
-    ! Total fte is omega*ft1int-k*ft2int+k*ft3int. Done in dentcalc.
-    ! It might be more efficient to have an array of omegad and do
-    ! all the tauxcalcs at once on the array.
     Ftraptotal=0.
     do i=1,nvy
        omegad=omega-k*vy(i)
-       call FtEint(omegad,Ftrapvy(i),fywy(i))
-!       write(*,*)'dvy,Ftraptotal',dvy,Ftraptotal
+       call FtEint(omegad,Ftrapvy(i),fywy(i),fy(i))
+! Do we weight by fy here?
+!       Ftraptotal=Ftraptotal+Ftrapvy(i)*fy(i)*dvy
        Ftraptotal=Ftraptotal+Ftrapvy(i)*dvy
        if(idebug.ne.0)write(*,'(a,i4,es10.2,a,f8.4,2e12.4)')&
             'i,R(omegad)',i,real(omegad),  &
@@ -352,32 +368,39 @@ contains
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 end module shiftmode
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+include 'fhgfunc.f'
 
 program main
   use shiftmode 
   integer, parameter ::   nk=21
   real :: kik(nk)
   complex :: Fcpassing(nk),Ftrapped(nk),Ftotal
+  integer, parameter :: np=50
+  real :: psinp(np),Ftnp(np),Fpnp(np),hnp(np),gnp(np),hmgnp(np)
+
+  omega=(0.0,.05)
+  do ip=1,np
+     psi=.01*ip
+     psinp(ip)=psi
   call initialize
   write(*,*)'nx, ne, nvy,   xL,    pL,   omegar,  omegai,     k     psi   beta'
   write(*,'(3i4,7f8.4)')nx,ne,nvy,xL,pL,real(omega),imag(omega),k,psi,beta
 !  call passingdiags
 
   idebug=-2
-!  call FtVyint()
+ !  call FtVyint()
 !  write(*,*)'Ftraptotal',Ftraptotal
   if(.false.)then
-     omegad=complex(.05,.003)
-     call FtEint(omegad,Ftotal,1.)
+     omegad=complex(.0,.001)
+     call FtEint(omegad,Ftotal,-1.,1.)
      write(*,*)'k*vy,Ftotal (trapped)',real(omegad),Ftotal
   endif
 
   idebug=0
 ! k-scan
-  omega=(0.0,.015)
   akmax=.04
   write(*,*)'   k     Fpassing                Ftrapped'
-  do ik=1,nk
+  do ik=1,1
      k=(ik-1.)*akmax/(nk-1.)
      kik(ik)=k
      call dentcalc2
@@ -391,6 +414,36 @@ program main
      Ftrapped(ik)=Ftraptotal
      write(*,'(f6.4,4es12.3)')k,Fcpassing(ik),Ftraptotal
   enddo
+
+  call fhgfunc(psi,20.,100,pL,gave,have,gjint,pint)
+  so=-imag(omega)**2
+  write(*,*)'  psi      ( have=Total    gave=Ft     have-gave)*(-omega_i^2)'
+  write(*,'(5es12.4)')psi,have*so,gave*so &
+       ,(have-gave)*so,so
+  
+  Ftnp(ip)=real(Ftraptotal)/so
+  Fpnp(ip)=real(Fcpassing(ik-1))/so
+  hnp(ip)=have
+  gnp(ip)=gave
+  hmgnp(ip)=-(have-gave)
+  enddo
+
+  if(np.gt.1)then
+     call pltinit(0.,.5,0.,2.)
+     call axis
+     call axlabels('psi','normalized force')
+     call polyline(psinp,Ftnp,np)
+     call jdrwstr(wx2nx(psinp(np/2)),wy2ny(Ftnp(np/2)),'Trapped',-1.)
+     call polyline(psinp,Fpnp,np)
+     call jdrwstr(wx2nx(psinp(np/2)),wy2ny(Fpnp(np/2)),'Passing',-1.)
+     call color(3)
+!     call polyline(psinp,hnp,np)
+     call polyline(psinp,gnp,np)
+     call polyline(psinp,hmgnp,np)
+     call pltend()
+  endif
+
+  if(.false..and.ik.gt.2)then
   call multiframe(2,1,3)
   call autoplot(kik,real(Fcpassing),nk)
   call axis2()
@@ -403,5 +456,6 @@ program main
   call dashset(2)
   call polyline(kik,real(-Fcpassing),nk)
   call pltend()
-  
+  endif
+   
 end program main
