@@ -47,7 +47,7 @@ contains
 !Trapped particle routines. Can only be called after initialization.
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!  
   subroutine cxcalc(vpsi,omegad,trapforce,tb,dfe,dfeperp,xlent)
-    ! Calculate the past integral of tau vs x and C(tau) and
+    ! Calculate the past integral of tau vs x and L(tau) and
     ! phut(taut) vs x for a trapped particle of velocity vpsi at peak
     ! of potential. Return trapforce and orbit period tb These
     ! quantities are the differential force density with respect to vy
@@ -59,7 +59,7 @@ contains
     real :: vpsi,dfe,dfeperp,tb,xlent
     complex :: omegad,trapforce
 
-    complex :: Ltint,Ltemp,Ctbb2,exptb,exptbb2,sumfactor,exptau
+    complex :: exptau,Ltemp,Ltint,Ltbb2,exptb,exptbb2,sumfactor,Ltfactor
     Wj=vpsi**2/2-psi
     if(Wj.gt.0)then
        write(*,*)'Positive energy in trapped particle code'
@@ -91,14 +91,16 @@ contains
     if(istart.gt.nx/2)stop 'No steps on remeshed trapped orbit'    
     tau=0.
     v=0.
+    Lt=0.
     C=0.
     phiut=0.
     dtauprior=0.
-    ! Integrate to get tau and C(tau)
+    ! Integrate to get tau and L(tau)
     v(istart)=sqrt(2.*(phit(istart)+Wj))
     tau(istart)=v(istart)/phitprime(istart) ! To get to v at accel phiprime.
+    Ltfactor=exp(sqm1*omegad*tau(istart))
+    Lt(istart)=-0.5*v(istart)*(1.-Ltfactor)/(omegad)
     Ltint=exp(-sqm1*omegad*tau(istart))
-    C(istart)=-0.5*v(istart)*(Ltint-1.)/(omegad)
     do i=istart+1,iend
        v(i)=sqrt(2.*(phit(i)+Wj))
        if(v(i).lt.0.7*vpsi)then    ! Use phiprime to determine step
@@ -107,23 +109,21 @@ contains
           dtau=dxt*0.5*(v(i-1)+v(i))/(v(i-1)*v(i))
        endif
        tau(i)=tau(i-1)+dtau
+       Ltfactor=exp(sqm1*omegad*(tau(i)-tau(i-1))) ! Current exponential
        Ltemp=Ltint
        Ltint=exp(-sqm1*omegad*tau(i)) ! Current exponential
        vmean=(v(i)+v(i-1))/2.
 !       vmean=2./(1./v(i)+1./v(i-1))  ! makes no difference
-       C(i)=C(i-1)-vmean*(Ltint-Ltemp)/(omegad)   ! New integral
-       if(.not.(abs(C(i)).ge.0))then
-         write(*,*)'Ltint infinity', i,Ltint,Ltemp,tau(i)
-!          stop
-       endif
+       Lt(i)=Ltfactor*Lt(i-1)-vmean*(1.-Ltfactor)/(omegad)   ! New integral
     enddo
-    tbb2=tau(iend)+tau(istart)
+    tbb2=tau(iend)+tau(istart)              ! Use symmetry on end point
     tau(iend+1)=tbb2
     tb=2.*tbb2
+    Ltfactor=exp(sqm1*omegad*(tbb2-tau(iend))) ! Current exponential
     vmean=v(iend)/2.
-    Ctbb2=C(iend)-vmean*(exp(-sqm1*omegad*tbb2)-Ltint)/(omegad)
-    C(iend+1)=Ctbb2
-! Calculate phiut from C(i), and on the way integrate force round the orbit
+    Ltbb2=Ltfactor*Lt(iend)-vmean*(1.-Ltfactor)/(omegad)
+    Lt(iend+1)=Ltbb2
+! Calculate phiut from L(i), and on the way integrate force round the orbit
     exptb=exp(sqm1*omegad*tb)
     exptbb2=exp(sqm1*omegad*tbb2)
     sumfactor=1./(1.-exptb)
@@ -133,7 +133,7 @@ contains
 ! \int sqm1*phitprime*(omega*dfe ...)*phiut  dtau vpsi
     do i=istart,iend
        exptau=exp(sqm1*omegad*tau(i))
-       phiut(i)=omegad*exptau*((1.-exptb)*C(i)+(exptb-exptbb2)*Ctbb2) &
+       phiut(i)=omegad*((1.-exptb)*Lt(i)+exptau*(exptbb2-1.)*Ltbb2) &
             *sumfactor
 ! The dtau to be applied to this subsequent tau integral. 
        dtau=tau(i)-tau(i-1)
@@ -150,8 +150,8 @@ contains
        write(*,'(10f8.4)')xt
        write(*,*)'tau'
        write(*,'(10f8.2)')tau
-       write(*,*)'imag(C)'
-       write(*,'(10f8.5)')imag(C)
+       write(*,*)'imag(Lt)'
+       write(*,'(10f8.5)')imag(Lt)
        write(*,*)'real(phiut)'
        write(*,'(10f8.5)')real(phiut)
     endif
@@ -193,7 +193,7 @@ contains
              call cyccolor(i,14)
              call polyline(xt,10.*v-8.,nx)
 !             call polyline(xt,10.*sqrt(2.*phit)-7.8,nx)
-             call polyline(xt,0.1*imag(C),nx)
+             call polyline(xt,0.1*imag(Lt),nx)
 !             call polyline(xt,imag(phiut),nx)
              call polyline(xt,30.*real(phiut)+4.,nx)
 !             call polyline(-xt,-30.*real(phiut)-4.,nx)
@@ -209,7 +209,7 @@ contains
        endif
        if(.not.(abs(Ftrap(i)).ge.0))then
           write(*,*)'Ftrap NAN?',Ftrap(i),Wj,dfe,dfeperp,vpsi,dvpsi
-          stop
+!          stop
        endif
 
        if(idebug.eq.-2)then
@@ -376,11 +376,13 @@ program main
   real :: kik(nk)
   complex :: Fcpassing(nk),Ftrapped(nk),Ftotal
   integer, parameter :: np=50
+!  integer, parameter :: np=2
   real :: psinp(np),Ftnp(np),Fpnp(np),hnp(np),gnp(np),hmgnp(np)
 
   omega=(0.0,.05)
   do ip=1,np
      psi=.01*ip
+!     psi=.1*ip
      psinp(ip)=psi
   call initialize
   write(*,*)'nx, ne, nvy,   xL,    pL,   omegar,  omegai,     k     psi   beta'
