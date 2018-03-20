@@ -6,6 +6,7 @@ SHELL=/bin/bash
 ACCISPARENT= $(HOME)/src/
 ACCISHOME=${ACCISPARENT}accis/
 ACCISX=$(ACCISHOME)libaccisX.a
+MODULES=shiftmode.o
 LIBRARIES = -L$(ACCISHOME) -laccisX -lX11
 COMPILE-SWITCHES = -Wall -O2
 #########################################################################
@@ -59,8 +60,8 @@ $(ACCISX) : $(ACCISHOME)Makefile
 % : %.f $(ACCISX) ;
 	$(FORTRAN)  -o $* $(COMPILE-SWITCHES) $*.f  $(LIBRARIES)
 
-% : %.f90  makefile $(ACCISX) ;
-	$(FORTRAN)  -o $* $(COMPILE-SWITCHES) $*.f90  $(LIBRARIES)
+% : %.f90  makefile $(ACCISX) $(MODULES);
+	$(FORTRAN)  -o $* $(COMPILE-SWITCHES) $*.f90 $(MODULES) $(LIBRARIES)
 
 % : %.F$ (ACCISX) ;
 	$(FORTRAN)  -o $* $(COMPILE-SWITCHES) $*.F  $(LIBRARIES)

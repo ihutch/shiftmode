@@ -161,9 +161,8 @@ contains
   subroutine FtEint(omegad,Ftotal,dfperpdWperp,fperp)
   ! Here we need to iterate over fe (trapped). Wj=vpsi^2/2-psi. So
   ! vpsi=sqrt(2(psi+Wj)) We must use cells that fill the Wj range 0 to
-  ! -psi.  Equal W steps are best.
+  ! -psi. 
     complex :: omegad,Ftotal
-    character*20 :: string
     Ftotal=0.
     if(idebug.eq.-2)then
        write(*,*)'FtEint',omegad,beta,dfperpdWperp
@@ -172,7 +171,7 @@ contains
        call pltinit(-12.,12.,-8.,8.)
        call axis()
     endif
-    iwpow=2         ! Equal W spacing ipow=1
+    iwpow=2         ! Equal W spacing is ipow=1
     do i=1,ne
        Wj=psi*(-((i-0.5)/ne)**iwpow)
        fe=exp(-beta*Wj)/sqrt(2.*pi) ! Normalized f_\parallel
@@ -184,35 +183,10 @@ contains
             +sqrt(2.*psi*(1.-(float(i-1)/ne)**iwpow))
        ! calculate the force Ftrap for this dvpsi and dvy element:
        call cxcalc(vpsi,omegad,Ftrap(i),tbe(i),dfe,dfeperp,xlen(i))
-       if(idebug.eq.-2)then
-!          write(*,*)'tau'
-          write(string,'(10f8.2)')tbe(i)
-          if(i.eq.0)then
-!             call axlabels('x','v')
-!             call autoplot(xt,real(phiut),nx)
-          else
-             call cyccolor(i,14)
-             call polyline(xt,10.*v-8.,nx)
-!             call polyline(xt,10.*sqrt(2.*phit)-7.8,nx)
-             call polyline(xt,0.1*imag(Lt),nx)
-!             call polyline(xt,imag(phiut),nx)
-             call polyline(xt,30.*real(phiut)+4.,nx)
-!             call polyline(-xt,-30.*real(phiut)-4.,nx)
-             if(maxval(abs(real(phiut))).gt.3.)then
-!                write(*,'(10f8.4)'),real(phiut)
-                idb=idebug
-                idebug=-3
-!                call cxcalc(vpsi,omegad,Ftrap(i),tbe(i),dfe,dfeperp,xlen(i))
-                idebug=idb
-             endif
-          endif
-!          call legendline(-0.4,1-i*.05,258,string)
-       endif
        if(.not.(abs(Ftrap(i)).ge.0))then
           write(*,*)'Ftrap NAN?',Ftrap(i),Wj,dfe,dfeperp,vpsi,dvpsi
-!          stop
+          stop
        endif
-
        if(idebug.eq.-2)then
           write(*,'(2f8.4,a,2es12.4,a,f8.3,f9.5,es12.4)')vpsi&
                ,fe*sqrt(2.*pi) &
@@ -222,11 +196,6 @@ contains
        ! Here we do not multiply by vpsi because that was done in cxcalc.
        ! But we multiply by 2. to account for \pm v_\psi.
     enddo
-    if(idebug.eq.-2)then 
-       call pltend()
-!       call autoplot(real(Ftrap),imag(Ftrap),ne)
-!       call pltend()
-    endif
   end subroutine FtEint
   !--------------------------------------------
   subroutine FtVyint()
@@ -235,8 +204,6 @@ contains
     do i=1,nvy
        omegad=omega-k*vy(i)
        call FtEint(omegad,Ftrapvy(i),fywy(i),fy(i))
-! Do we weight by fy here?
-!       Ftraptotal=Ftraptotal+Ftrapvy(i)*fy(i)*dvy
        Ftraptotal=Ftraptotal+Ftrapvy(i)*dvy
        if(idebug.ne.0)write(*,'(a,i4,es10.2,a,f8.4,2e12.4)')&
             'i,R(omegad)',i,real(omegad),  &
@@ -414,103 +381,3 @@ contains
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 end module shiftmode
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-include 'fhgfunc.f'
-
-program main
-  use shiftmode 
-  integer, parameter ::   nk=2
-  real :: kik(nk)
-  complex :: Fcpassing(nk),Ftrapped(nk),Ftotal
-  integer, parameter :: np=50
-!  integer, parameter :: np=2
-  real :: psinp(np),Ftnp(np),Fpnp(np),hnp(np),gnp(np),hmgnp(np),gjnp(np),pnp(np)
-  omega=(0.0,.01)
-  psistep=.01
-  call pfset(3)
-  do ip=1,np
-     psi=psistep*ip
-!     psi=.1*ip
-     psinp(ip)=psi
-  call initialize
-  write(*,*)'nx, ne, nvy,   xL,    pL,   omegar,  omegai,     k     psi   beta'
-  write(*,'(3i4,7f8.4)')nx,ne,nvy,xL,pL,real(omega),imag(omega),k,psi,beta
-!  call passingdiags
-
-  idebug=-2
- !  call FtVyint()
-!  write(*,*)'Ftraptotal',Ftraptotal
-  if(.false.)then
-     omegad=complex(.0,.001)
-     call FtEint(omegad,Ftotal,-1.,1.)
-     write(*,*)'k*vy,Ftotal (trapped)',real(omegad),Ftotal
-  endif
-
-  idebug=0
-! k-scan
-  akmax=.008
-  write(*,*)'   k     Fpassing                Ftrapped'
-  do ik=1,2
-     k=(ik-1.)*akmax/(nk-1.)
-     kik(ik)=k
-     call dentcalc2
-!     write(*,*)'dtaumax=',dtaumax,' kvymax.dtaumax=',k*vymax*dtaumax
-! Integrate phi'*n-tilde dx.  
-! Should we double the positive ntilde contribution to account for negative?
-     Fcpassing(ik)=0.
-     do i=1,nx
-        Fcpassing(ik)=Fcpassing(ik)+phiprime(i)*dent(i)*dx
-     enddo
-     call FtVyint()
-     Ftrapped(ik)=Ftraptotal
-     write(*,'(f6.4,4es12.3)')k,Fcpassing(ik),Ftraptotal
-  enddo
-
-  call fhgfunc(psi,20.,100,pL,gave,have,gjave,pint)
-  so=-imag(omega)**2
-!  write(*,*)'  psi      ( have=Total    gave=Ft     have-gave)*(-omega_i^2)'
-!  write(*,'(5es12.4)')psi,have*so,gave*so &
-!       ,(have-gave)*so,so
-  
-  Ftnp(ip)=real(Ftraptotal)/so
-  Fpnp(ip)=real(Fcpassing(ik-1))/so
-  hnp(ip)=have
-  gnp(ip)=gave
-  gjnp(ip)=gjave
-  pnp(ip)=-pint
-  hmgnp(ip)=(have-gave)
-  enddo
-
-  if(np.gt.1)then
-     call pltinit(0.,np*psistep,-np*psistep*1.3,np*psistep*4.)
-     call axis
-     call axlabels('psi','normalized force')
-     call polyline(psinp,Ftnp,np)
-     call jdrwstr(wx2nx(psinp(np/2)),wy2ny(Ftnp(np/2)),'Trapped',-1.)
-     call polyline(psinp,Fpnp,np)
-     call jdrwstr(wx2nx(psinp(np/2)),wy2ny(Fpnp(np/2)),'Passing',-1.)
-     call color(3)
-     call dashset(1)
-     call polyline(psinp,gnp,np)
-     call polyline(psinp,hmgnp,np)
-!     call polyline(psinp,gjnp,np) ! trapped force w/o boundary term
-!     call polyline(psinp,pnp,np)  ! passing force w/o boundary term
-     call dashset(0)
-     call pltend()
-  endif
-
-  if(.false..and.ik.gt.2)then
-  call multiframe(2,1,3)
-  call autoplot(kik,real(Fcpassing),nk)
-  call axis2()
-  call axlabels('k','Fpassing')
-  call polyline(kik,imag(FCpassing),nk)
-  call autoplot(kik,real(Ftrapped),nk)
-  call axis2()
-  call axlabels('k','Ftrapped')
-  call polyline(kik,imag(Ftrapped),nk)
-  call dashset(2)
-  call polyline(kik,real(-Fcpassing),nk)
-  call pltend()
-  endif
-   
-end program main
