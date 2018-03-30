@@ -13,31 +13,26 @@ program main
   real :: psinp(np),hnp(np),gnp(np),hmgnp(np),gjnp(np),pnp(np)
   real, dimension(np,nk) :: Ftnp,Fpnp
 !  character*10 :: string
-  omega=(0.0,.002)
   psistep=.01
-  so=-imag(omega)**2
-  so=real(omega**2)   ! the same here.
   do ip=1,np  ! Iterate over psi.
      psi=psistep*ip
      psinp(ip)=psi
-     call initialize
-     write(*,*)'nx, ne, nvy,   xL,    pL,   omegar,  omegai,     k     psi   beta'
-     write(*,'(3i4,7f8.4)')nx,ne,nvy,xL,pL,real(omega),imag(omega),k,psi,beta
-     !  call passingdiags
-
 ! k-scan disabled here because nk=1 use the minimum.
-     akmax=.00002
+     akmax=sqrt(psi)/8.
      akmin=.0000
      write(*,*)'   k     Fpassing                Ftrapped'
      do ik=1,nk
         k=akmin+(ik-1.)*(akmax-akmin)/max(nk-1.,1.)
         kik(ik)=k
-        call dentcalc2
-        ! Integrate phi'*n-tilde dx.  
-        Fcpassing(ik)=0.
-        do i=1,nx
-           Fcpassing(ik)=Fcpassing(ik)+phiprime(i)*dent(i)*dx
-        enddo
+        omega=sqrt(psi)*(0.0001+k/4.)*sqm1
+        so=-imag(omega)**2
+        so=real(omega**2)   ! the same here.
+        call initialize
+        write(*,*)'nx, ne, nvy,   xL,    pL,   omegar,  omegai,     k     psi   beta'
+        write(*,'(3i4,7f8.4)')nx,ne,nvy,xL,pL,real(omega),imag(omega),k,psi,beta
+     !  call passingdiags
+        call dentcalc2()
+        Fcpassing(ik)=Fpasstotal
         call FtVyint()
         Ftrapped(ik)=Ftraptotal
         write(*,'(f6.4,4es12.3)')k,Fcpassing(ik),Ftraptotal

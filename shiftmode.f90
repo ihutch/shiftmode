@@ -1,14 +1,15 @@
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 module shiftmode
   ! We use x in place of z, because x is real.
-  integer, parameter :: nx=100, ne=40, nvy=30
+!  integer, parameter :: nx=50, ne=60, nvy=200
+  integer, parameter :: nx=100, ne=30, nvy=50
   real :: xL=20.,Emax=4.,vymax=4.            ! Hole length, Energy, v_y 
   real :: psi=.1,pL=4.,k=.01, Ty=1.          ! psi, sech4width, k, Ty
   real :: beta                               ! inverse hole parallel temp.
   real :: pi=3.1415926   
   complex :: omega=(0.0,.01)                  ! complex frequency
   integer :: idebug=0
-  complex :: omegad,sqm1=(0.,1.),Ftraptotal
+  complex :: omegad,sqm1=(0.,1.),Ftraptotal,Fpasstotal
   ! Position arrays
   real :: dx
   real :: x(nx),phi(nx),phiprime(nx),tau(nx),v(nx)
@@ -212,62 +213,6 @@ contains
   end subroutine FtVyint
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 ! Passing particle routines.
-  subroutine tauxcalc(vinf,omegad,thisdtaumax)  ! Passing particles
-    ! integrate dx/v to get v(x), tau(x), Lt(x,t=0), phiut, at vinf,omegad
-    ! return maximum dtau used for accuracy checking
-    real    :: vinf,thisdtaumax
-    complex :: omegad      ! Input omega'
-    complex :: Ltint,Ltemp
-    logical :: ldone=.false.
-    thisdtaumax=0.
-    scalefactor=1.e4       ! To avoid overflows we need intermediate scaling
-    taustep=alog(scalefactor)/max(imag(omegad),1.e-5) ! tau-value at which
-    tau(1)=0.                                         ! to rescale.
-    v(1)=sqrt(vinf**2+2.*phi(1))
-    Ltint=1.                                          ! prior exp(0)
-    Lt(1)=0.                                          ! Lt integrated
-    phiut(1)=v(1)-vinf
-! Do \int_-\infty^t exp(-i*omegad*tau) dtau, passing: Lt(i). And phiut(i)
-    do i=2,nx
-       v(i)=sqrt(vinf**2+2.*phi(i))
-       dtau=dx*0.5*(v(i-1)+v(i))/(v(i-1)*v(i))        ! tau increment varies
-       if(dtau.gt.thisdtaumax)thisdtaumax=dtau
-       tau(i)=tau(i-1)+dtau
-       Lt(i)=Lt(i-1)
-       if(tau(i).gt.taustep)then        ! Rescale to avoid overflow.
-          do
-             tau(i)=tau(i)-taustep         ! Subtract from tau
-             Ltint=Ltint*exp(sqm1*omegad*taustep)  ! Scale down prior values
-             Lt(i)=Lt(i-1)*exp(sqm1*omegad*taustep)! by scalefactor.
-             if(tau(i).le.taustep)exit
-          enddo
-       endif
-       Ltemp=Ltint
-       Ltint=exp(-sqm1*omegad*tau(i)) ! Current exponential
-       vmean=(v(i)+v(i-1))/2.-vinf
-       Lt(i)=Lt(i)-vmean*(Ltint-Ltemp)/(omegad)   ! New integral
-       ! Adjust scales so that tau at end is t=0 in
-       ! phiut and the effective integral is from -infty to 0.
-       !       phiut(i)=omegad*Lt(i)*exp(sqm1*omegad*tau(i))
-       phiut(i)=omegad*Lt(i)*exp(sqm1*omegad*tau(i))
-    enddo
-    if(idebug.gt.0.and..not.ldone)then
-       write(*,'(a,2f8.4,a,f8.4,a,f8.2)')'omegad',omegad,' vinf', &
-         vinf,' taustep',taustep
-       write(*,*)'phi'
-       write(*,'(10f8.4)')phi
-       write(*,*)'v'
-       write(*,'(10f8.4)')v
-       write(*,*)'tau'
-       write(*,'(10f8.2)')tau
-       write(*,*)'real(Lt)'
-       write(*,'(10f8.1)')real(Lt)
-       write(*,*)'real(phiut)'
-       write(*,'(10f8.2)')real(phiut)
-       ldone=.true.
-    endif
-    
-  end subroutine tauxcalc
   !--------------------------------------------
   subroutine tauxcalcnew(vinf,omegad,thisdtaumax)  
     ! Passing particles
@@ -332,12 +277,14 @@ contains
     enddo
   end subroutine ftildecalc
   !--------------------------------------------
-  subroutine dentcalc2 ! Integrate over v_parallel to get passing n-tilde.
+  subroutine dentcalc2 
+    ! Integrate over v_parallel to get passing n-tilde and force.
     ! Alternate using histogram vinf distribution.
     ! This is the outermost integral. It calls inner integrals (dvy(dtau)).
     ! On the way, calculate the f(x,E) array. Only non-adiabatic.
     ! Also calculate the adiabatic density perturbation, denad.
     ! So far only positive velocity direction. 
+    complex :: Force
     sq2pi=sqrt(2.*pi)
     vinfmax=sqrt(2.*Emax)      ! The uppermost orbit
     dvinf=vinfmax/ne           ! Use steps of constant vinf spacing.
@@ -368,14 +315,17 @@ contains
           write(*,'(10f8.4)')phiut
        endif
        dent=dent+(fte(:,i)*vinf/v)*dvinf  ! Non-adiabatic
-! (-dphi/dx=\hat\phi)*(df/dE dv) for \Delta=1. ! Adiabatic not needed.
-!       denad=denad-phiprime*fe0de(i)*vinf/v*dvinf 
-! end of adiabatic section.
     enddo
 ! For stationary holes negative velocities just double the effective ne
 ! (Although actually it is the force they double and non-zero hole speed
 ! would require this to be done differently.)
     dent=dent*2
+! Integrate to get force:
+    Force=0.
+    do i=1,nx
+       Force=Force+phiprime(i)*dent(i)*dx
+    enddo
+    Fpasstotal=Force
   end subroutine dentcalc2
 !  include 'obsoletecode.f90'
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
