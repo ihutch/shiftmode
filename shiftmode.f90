@@ -3,10 +3,12 @@ module shiftmode
   ! We use x in place of z, because x is real.
 !  integer, parameter :: nx=50, ne=60, nvy=200
   integer, parameter :: nx=100, ne=30, nvy=50
+!  integer, parameter :: nx=20, ne=20, nvy=20
+  real, parameter :: pi=3.1415926
+  real, parameter :: sq2pi=sqrt(2.*3.1415926)
   real :: xL=20.,Emax=4.,vymax=4.            ! Hole length, Energy, v_y 
   real :: psi=.1,pL=4.,k=.01, Ty=1.          ! psi, sech4width, k, Ty
   real :: beta                               ! inverse hole parallel temp.
-  real :: pi=3.1415926   
   complex :: omega=(0.0,.01)                  ! complex frequency
   integer :: idebug=0
   complex :: omegad,sqm1=(0.,1.),Ftraptotal,Fpasstotal
@@ -19,14 +21,14 @@ module shiftmode
   complex :: priorcontrib(nx),phiutest(nx)
   complex :: ft1(nx),ft2(nx),ft3(nx),ft1int(nx),ft2int(nx),ft3int(nx)
   ! Energy arrays
-  real :: de,E(ne),fe0(ne),fe0de(ne)
+  real :: de,E(ne),vinfarray(ne),dvinf,fe0(ne),fe0de(ne)
   real :: xlen(ne),tbe(ne)                  ! Trapped orbit length, period.
   complex :: fte(nx,0:ne)
   complex :: Ftrap(ne)
   ! vy arrays
   real :: vy(nvy),fy(nvy),fywy(nvy),dtaumax
   real :: dvy
-  complex :: Ftrapvy(nvy)
+  complex :: Ftrapvy(nvy),Fpassvy(nvy)
 contains
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   subroutine initialize
@@ -35,6 +37,13 @@ contains
     x=dx*(/(i-1,i=1,nx)/)-xL                    ! x-position array
     phi=psi/cosh(x/pL)**4                       ! Potential
     phiprime=-psi*sinh(x/pL)/cosh(x/pL)**5*4/pL ! phi x-gradient
+    ! vinf arrays
+    vinfmax=sqrt(2.*Emax)      ! The uppermost orbit
+    dvinf=vinfmax/ne           ! Use steps of constant vinf spacing.
+    vinfarray=dvinf*(/(i-0.5,i=1,ne)/)
+    E=vinfarray**2/2.
+    fe0=exp(-E)/sq2pi ! Normalized Maxwellian with unit temperature.
+    fe0de=-fe0   ! Derivative wrt E is minus the same.
     ! vy-arrays
     dvy=vymax*2./(nvy-1.)                       ! vy-step
     vy=dvy*(/(i-1,i=1,nvy)/)-vymax
@@ -48,7 +57,7 @@ contains
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!  
 !Trapped particle routines. Can only be called after initialization.
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!  
-  subroutine cxcalc(vpsi,omegad,trapforce,tb,dfe,dfeperp,xlent)
+  subroutine cxcalc(vpsi,trapforce,tb,dfe,dfeperp,xlent)
     ! Calculate the past integral of tau vs x and L(tau) and
     ! phut(taut) vs x for a trapped particle of velocity vpsi at peak
     ! of potential. Return trapforce and orbit period tb These
@@ -59,7 +68,7 @@ contains
     ! and dfeperp. xlent returns the orbit length extreme, used for
     ! diagnostic purposes.
     real :: vpsi,dfe,dfeperp,tb,xlent
-    complex :: omegad,trapforce
+    complex :: trapforce
 
     complex :: exptau,Ltemp,Ltint,Ltbb2,exptb,exptbb2,sumfactor,Ltfactor
     Wj=vpsi**2/2-psi
@@ -159,11 +168,11 @@ contains
     endif
   end subroutine cxcalc
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!  
-  subroutine FtEint(omegad,Ftotal,dfperpdWperp,fperp)
+  subroutine FtEint(Ftotal,dfperpdWperp,fperp)
   ! Here we need to iterate over fe (trapped). Wj=vpsi^2/2-psi. So
   ! vpsi=sqrt(2(psi+Wj)) We must use cells that fill the Wj range 0 to
   ! -psi. 
-    complex :: omegad,Ftotal
+    complex :: Ftotal
     Ftotal=0.
     if(idebug.eq.-2)then
        write(*,*)'FtEint',omegad,beta,dfperpdWperp
@@ -183,7 +192,7 @@ contains
        dvpsi=-sqrt(2.*psi*(1.-(float(i)/ne)**iwpow)) &
             +sqrt(2.*psi*(1.-(float(i-1)/ne)**iwpow))
        ! calculate the force Ftrap for this dvpsi and dvy element:
-       call cxcalc(vpsi,omegad,Ftrap(i),tbe(i),dfe,dfeperp,xlen(i))
+       call cxcalc(vpsi,Ftrap(i),tbe(i),dfe,dfeperp,xlen(i))
        if(.not.(abs(Ftrap(i)).ge.0))then
           write(*,*)'Ftrap NAN?',Ftrap(i),Wj,dfe,dfeperp,vpsi,dvpsi
           stop
@@ -204,24 +213,22 @@ contains
     Ftraptotal=0.
     do i=1,nvy
        omegad=omega-k*vy(i)
-       call FtEint(omegad,Ftrapvy(i),fywy(i),fy(i))
+       call FtEint(Ftrapvy(i),fywy(i),fy(i))
        Ftraptotal=Ftraptotal+Ftrapvy(i)*dvy
        if(idebug.ne.0)write(*,'(a,i4,es10.2,a,f8.4,2e12.4)')&
             'i,R(omegad)',i,real(omegad),  &
-            '  vy,Im(Ftrapvy)',vy(i),imag(Ftrapvy(i)),imag(Ftraptotal)
+            '  vy,R(Ftrapvy)',vy(i),real(Ftrapvy(i)),real(Ftraptotal)
     enddo
   end subroutine FtVyint
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 ! Passing particle routines.
   !--------------------------------------------
-  subroutine tauxcalcnew(vinf,omegad,thisdtaumax)  
+  subroutine tauxcalcnew(vinf,thisdtaumax)  
     ! Passing particles
     ! integrate dx/v to get v(x), tau(x), Lt(x,t=0), phiut, at vinf,omegad
     ! return maximum dtau used for accuracy checking
     real    :: vinf,thisdtaumax
-    complex :: omegad      ! Input omega'
     complex :: expdtau
-    logical :: ldone=.false.
     tau(1)=0.
     thisdtaumax=0.
     v(1)=sqrt(vinf**2+2.*phi(1))
@@ -240,20 +247,9 @@ contains
        !       phiut(i)=omegad*Lt(i)*exp(sqm1*omegad*tau(i))
        phiut(i)=omegad*Lt(i)
     enddo
-    if(idebug.gt.0.and..not.ldone)then
-       write(*,'(a,2f8.4,a,f8.4,a,f8.2)')'omegad',omegad,' vinf', &
-         vinf,' taustep',taustep
-       write(*,*)'phi'
-       write(*,'(10f8.4)')phi
-       write(*,*)'v'
-       write(*,'(10f8.4)')v
-       write(*,*)'tau'
-       write(*,'(10f8.2)')tau
-       write(*,*)'real(Lt)'
-       write(*,'(10f8.1)')real(Lt)
-       write(*,*)'real(phiut)'
-       write(*,'(10f8.2)')real(phiut)
-       ldone=.true.
+    if(idebug.gt.1)then
+       write(*,'(a,2es12.4,a,f8.4,a,2es12.4)')'omegad',omegad,' vinf', &
+            vinf,' phiut(nx/2)',phiut(nx/2)
     endif
   end subroutine tauxcalcnew
   !--------------------------------------------
@@ -266,7 +262,7 @@ contains
     ! all the tauxcalcs at once on the array.
     do i=1,nvy
        omegad=omega-k*vy(i)
-       call tauxcalcnew(vinf,omegad,dtaumax) ! Integrate along past orbit
+       call tauxcalcnew(vinf,dtaumax) ! Integrate along past orbit
                                           ! to get phiut, hence ft1-3
        ft1=dfe*fy(i)*phiut
        ft2=dfe*fy(i)*vy(i)*phiut
@@ -285,36 +281,18 @@ contains
     ! Also calculate the adiabatic density perturbation, denad.
     ! So far only positive velocity direction. 
     complex :: Force
-    sq2pi=sqrt(2.*pi)
     vinfmax=sqrt(2.*Emax)      ! The uppermost orbit
     dvinf=vinfmax/ne           ! Use steps of constant vinf spacing.
     denad=0.                   ! adiabatic density 
     dent=0.                    ! n-tilde
     vinf=0.
     do i=1,ne                  ! Integrate over ne orbits (energies)
-       vinf=(i-0.5)*dvinf
-       E(i)=vinf**2/2.
-       fe0(i)=exp(-E(i))/sq2pi ! Normalized Maxwellian with unit temperature.
-       fe0de(i)=-fe0(i)   ! Derivative wrt E is minus the same.
        ! ftildecalc calls tauxcalc which also calculates v(nx) for this vinf.
-       call ftildecalc(vinf,fe0(i),fe0de(i))
+       call ftildecalc(vinfarray(i),fe0(i),fe0de(i))
        ! No factor q_e has been applied to phiut, so no q_e factor here.
        fte(:,i)=sqm1*(omega*ft1int+k*(-ft2int+ft3int))  ! tilde-f_x(x,E)
        if(idebug.gt.1)write(*,'(i4,10f8.4)')i,E(i),vinf,fe0(i),omega,k
-       if(i.eq.1.and.idebug.gt.1)then
-          write(*,*)'  i    E(i)   vinf   fe0(i)  omegar  omegai    k'
-          write(*,*)'ft1int'
-          write(*,'(10f8.4)')ft1int
-          write(*,*)'ft2int'
-          write(*,'(10f8.4)')ft2int
-          write(*,*)'ft3int'
-          write(*,'(10f8.4)')ft3int
-          write(*,*)'fte(:,i)'
-          write(*,'(10f8.4)')fte(:,i)
-          write(*,*)'phiut'
-          write(*,'(10f8.4)')phiut
-       endif
-       dent=dent+(fte(:,i)*vinf/v)*dvinf  ! Non-adiabatic
+       dent=dent+(fte(:,i)*vinfarray(i)/v)*dvinf  ! Non-adiabatic
     enddo
 ! For stationary holes negative velocities just double the effective ne
 ! (Although actually it is the force they double and non-zero hole speed
@@ -327,7 +305,83 @@ contains
     enddo
     Fpasstotal=Force
   end subroutine dentcalc2
-!  include 'obsoletecode.f90'
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+! Alternate integration order passing particle code.
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  subroutine dFdvinfdvy(vinf,passforce,dfe,dfeperp)  
+  ! Combination of tauxcalc and integration over the hole to give
+  ! differential force for passing particles.
+  ! Calculate the past integral of tau vs x and L(tau) and
+  ! phiut(taut) vs x for passing particles of velocity vinf.
+  ! Return the differential force density with respect to vy
+  ! and vinf. This has to be integrated f(vinf,vy) dvinf dvy. The
+  ! contributions to force are proportional to df/dW_parallel and
+  ! df/dW_perp evaluated at these orbit energies, which we denote dfe
+  ! and dfeperp. omegad effectively determines kv_y in the force. 
+    real    :: vinf,dfe,dfeperp
+    complex :: passforce
+    complex :: expdtau
+    tau(1)=0.
+    thisdtaumax=0.
+    v(1)=sqrt(vinf**2+2.*phi(1))
+    Lt(1)=0.                                          ! Lt integrated
+    phiut(1)=v(1)-vinf
+    phiut(1)=0.                                       ! More consistent.
+    passforce=0.
+! Do \int_-\infty^t exp(-i*omegad*tau) dtau, passing: Lt(i). And phiut(i)
+! And Force integration.
+    do i=2,nx
+       v(i)=sqrt(vinf**2+2.*phi(i))
+       dtau=dx*0.5*(v(i-1)+v(i))/(v(i-1)*v(i))        ! tau increment varies
+       if(dtau.gt.thisdtaumax)thisdtaumax=dtau
+       tau(i)=tau(i-1)+dtau
+       expdtau=exp(sqm1*omegad*dtau)
+       vmean=(v(i)+v(i-1))/2.-vinf
+       Lt(i)=expdtau*Lt(i-1)-vmean*(1.-expdtau)/(omegad)   ! New integral
+       !       phiut(i)=omegad*Lt(i)*exp(sqm1*omegad*tau(i))
+       phiut(i)=omegad*Lt(i)
+       passforce=passforce+sqm1*  &
+       (phiut(i)*phitprime(i)+phiut(i-1)*phitprime(i-1))/2. &
+       *(omegad*dfe-(omegad-omega)*dfeperp)*dx &
+       *(2.*vinf/(v(i)+v(i-1))) ! Uncertain correction.
+    enddo
+    if(idebug.gt.1)then
+       write(*,'(a,2es12.4,a,f8.4,a,2es12.4)')'omegad',omegad,' vin',vinf,' phiut(n/2)',phiut(nx/2)
+    endif
+  end subroutine dFdvinfdvy
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  subroutine FpEint(Ftotal,dfperpdWperp,fperp)
+    ! Integrate over v_inf to get passing force using histogram vinf.
+    ! So far only positive velocity direction. 
+    complex :: Ftotal
+    real :: dfperpdWperp,fperp
+    real :: dfeperp
+    complex :: passforce
+    Ftotal=0.
+    do i=1,ne                  ! Integrate over ne orbits (energies)
+       dfe=fe0de(i)*fperp
+       dfeperp=fe0(i)*dfperpdWperp
+       call dFdvinfdvy(vinfarray(i),passforce,dfe,dfeperp)  
+       ! No factor q_e has been applied to phiut, so no q_e factor here.
+       Ftotal=Ftotal+passforce*dvinf
+    enddo
+! For stationary holes negative velocities just double the effective force
+! (Although non-zero hole speed would require this to be done differently.)
+    Ftotal=2.*Ftotal
+  end subroutine FpEint
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  subroutine FpVyint()
+    ! Integrate (histogram) over vy
+    Fpasstotal=0.
+    do i=1,nvy
+       omegad=omega-k*vy(i)
+       call FpEint(Fpassvy(i),fywy(i),fy(i))
+       Fpasstotal=Fpasstotal+Fpassvy(i)*dvy
+       if(idebug.ne.0)write(*,'(a,i4,es10.2,a,f8.4,2e12.4)')&
+            'i,R(omegad)',i,real(omegad),  &
+            '  vy,R(Fpassvy)',vy(i),real(Fpassvy(i)),real(Fpasstotal)
+    enddo
+  end subroutine FpVyint
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 end module shiftmode
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
