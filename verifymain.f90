@@ -8,7 +8,7 @@ program main
   integer, parameter ::   nk=1
   real :: kik(nk)
   complex :: Fcpassing(nx),Ftrapped(nk)
-  integer, parameter :: np=6
+  integer, parameter :: np=20
 !  integer, parameter :: np=2
   real :: psinp(np),hnp(np),gnp(np),hmgnp(np),gjnp(np),pnp(np)
   real, dimension(np,nk) :: Ftnp,Fpnp
@@ -31,7 +31,7 @@ program main
         write(*,*)'nx, ne, nvy,   xL,    pL,   omegar,  omegai,     k     psi   beta'
         write(*,'(3i4,7f8.4)')nx,ne,nvy,xL,pL,real(omega),imag(omega),k,psi,beta
      !  call passingdiags
-        idebug=1
+        idebug=0
 !        call dentcalc2()
         call FpVyint()
         idebug=0

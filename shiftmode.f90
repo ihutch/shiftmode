@@ -40,13 +40,13 @@ contains
     ! vinf arrays
     vinfmax=sqrt(2.*Emax)      ! The uppermost orbit
     dvinf=vinfmax/ne           ! Use steps of constant vinf spacing.
-    vinfarray=dvinf*(/(i-0.5,i=1,ne)/)
+    vinfarray=dvinf*(/(i-0.5,i=1,ne)/)  ! vinf array 
     E=vinfarray**2/2.
     fe0=exp(-E)/sq2pi ! Normalized Maxwellian with unit temperature.
     fe0de=-fe0   ! Derivative wrt E is minus the same.
     ! vy-arrays
     dvy=vymax*2./(nvy-1.)                       ! vy-step
-    vy=dvy*(/(i-1,i=1,nvy)/)-vymax
+    vy=dvy*(/(i-1,i=1,nvy)/)-vymax              ! vy array.
     fy=exp(-vy**2/(2.*Ty))/sqrt(2.*pi*Ty)       ! fy Normalized Maxwellian
     fywy=-fy/Ty                                 ! gradient
     dtaumax=0.
@@ -244,7 +244,6 @@ contains
        expdtau=exp(sqm1*omegad*dtau)
        vmean=(v(i)+v(i-1))/2.-vinf
        Lt(i)=expdtau*Lt(i-1)-vmean*(1.-expdtau)/(omegad)   ! New integral
-       !       phiut(i)=omegad*Lt(i)*exp(sqm1*omegad*tau(i))
        phiut(i)=omegad*Lt(i)
     enddo
     if(idebug.gt.1)then
@@ -338,12 +337,12 @@ contains
        expdtau=exp(sqm1*omegad*dtau)
        vmean=(v(i)+v(i-1))/2.-vinf
        Lt(i)=expdtau*Lt(i-1)-vmean*(1.-expdtau)/(omegad)   ! New integral
-       !       phiut(i)=omegad*Lt(i)*exp(sqm1*omegad*tau(i))
        phiut(i)=omegad*Lt(i)
+       ! Histogram version.
        passforce=passforce+sqm1*  &
-       (phiut(i)*phitprime(i)+phiut(i-1)*phitprime(i-1))/2. &
-       *(omegad*dfe-(omegad-omega)*dfeperp)*dx &
-       *(2.*vinf/(v(i)+v(i-1))) ! Uncertain correction.
+            (phiut(i)*phiprime(i)) &
+            *(omegad*dfe-(omegad-omega)*dfeperp)*dx &
+            *(vinf/v(i)) ! Uncertain correction.
     enddo
     if(idebug.gt.1)then
        write(*,'(a,2es12.4,a,f8.4,a,2es12.4)')'omegad',omegad,' vin',vinf,' phiut(n/2)',phiut(nx/2)
