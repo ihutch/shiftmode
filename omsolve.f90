@@ -112,7 +112,7 @@ real function forcebalance(omega0,omega1,frac,omega2)
   real, intent(out) :: omega2
   omega2=(1-frac)*omega0+frac*omega1
   omega=complex(0.,omega2)
-  call dentcalc2()  
+  call FpVyint()
   call FtVyint()
   forcebalance=real(Ftraptotal)+real(Fpasstotal)
 !  write(*,*)frac,omega2,forcebalance,forcebalance/(abs(Ftraptotal)+abs(Fpasstotal))

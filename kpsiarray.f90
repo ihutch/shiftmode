@@ -5,38 +5,42 @@ include 'fhgfunc.f'
 
 program main
   use shiftmode 
-  integer, parameter ::   nk=6
+  integer, parameter ::   nk=20
   real :: kik(nk)
   complex :: Fcpassing(nx),Ftrapped(nk)
-  integer, parameter :: np=20
+  integer, parameter :: np=11
 !  integer, parameter :: np=2
   real :: psinp(np),hnp(np),gnp(np),hmgnp(np),gjnp(np),pnp(np)
   real, dimension(np,nk) :: Ftnp,Fpnp
   character*10 :: string
-  omega=(0.0,.002)
-  psistep=.01
-  so=-imag(omega)**2
+  omega=(0.0,.001)
+  psimax=1.
+  psistep=psimax/(np-1)
+  !  akmax=2.5*imag(omega)
+  akmax=1.2*imag(omega)
+  akmin=.000
+  so=-imag(omega)**2  ! equivalent.
+  so=real(omega**2)   ! equivalent.
+  ! so is a Negative quantity equal to omega**2, since omega_r=0.
+  ! \ddot{U}=(i\omega_i)^2*\Delta= so*\Delta. Therefore normalizing to
+  ! so is normalizing to a force from negative \ddot{U}, since Delta
+  ! is +ve. Still puzzling.
+
   do ip=1,np  ! Iterate over psi.
-     psi=psistep*ip
+     psi=psistep*(ip-1)
+     if(ip.eq.1)psi=0.2*psistep
      psinp(ip)=psi
      call initialize
      write(*,*)'nx, ne, nvy,   xL,    pL,   omegar,  omegai,     k     psi   beta'
      write(*,'(3i4,7f8.4)')nx,ne,nvy,xL,pL,real(omega),imag(omega),k,psi,beta
-     !  call passingdiags
 
 ! k-scan
-     akmax=.002
-     akmin=.000
      write(*,*)'   k     Fpassing                Ftrapped'
      do ik=1,nk
         k=akmin+(ik-1.)*(akmax-akmin)/(max(nk-1.,1.))
         kik(ik)=k
-        call dentcalc2
-        ! Integrate phi'*n-tilde dx.  
-        Fcpassing(ik)=0.
-        do i=1,nx
-           Fcpassing(ik)=Fcpassing(ik)+phiprime(i)*dent(i)*dx
-        enddo
+        call FpVyint()
+        Fcpassing(ik)=Fpasstotal
         call FtVyint()
         Ftrapped(ik)=Ftraptotal
         write(*,'(f6.4,4es12.3)')k,Fcpassing(ik),Ftraptotal
@@ -57,6 +61,7 @@ program main
   call pltinit(0.,np*psistep,-np*psistep*1.3,np*psistep*4.)
   call axis
   call axlabels('!Ay!@','Force !BF!dt!d , F!dp!d!@ (/!Aw!@!u2!u)')
+  call winset(.true.)
   do ik=1,nk
      call polyline(psinp,Ftnp(:,ik),np)
      call polyline(psinp,Fpnp(:,ik),np)
@@ -77,5 +82,36 @@ program main
   call dashset(0)
   call color(15)
   call pltend()
-   
+
+  ! Force versus k.
+!  call minmax(Ftnp(np,:),nk,Fmin,Fmax)
+  !  call pltinit(-0.1*k,k,Fmin,Fmax)
+  Fmax=Ftnp(np,1)+Fpnp(np,1)
+  !  call pltinit(-0.1*k,k,-np*psistep*1.3,np*psistep*5.)
+  call pltinit(-0.1*k/imag(omega),k/imag(omega),-0.3*Fmax,1.1*Fmax)
+  call axis
+  call axlabels('!Bk!@/!Aw!@!di!d','Force !BF!dt!d+F!dp!d!@ (/!Aw!@!u2!u)')
+  call winset(.true.)
+  call polyline((/-0.1*k/imag(omega),k/imag(omega)/),(/0.,0./),2)
+       
+  do ip=1,np     
+     call fwrite(psinp(ip),iwidth,2,string)
+     call polyline(kik/imag(omega),Ftnp(ip,:)+Fpnp(ip,:),nk)
+     call jdrwstr(wx2nx(0.),wy2ny(Ftnp(ip,1)+Fpnp(ip,1)),string(1:iwidth),-1.)
+     call fwrite(imag(omega),iwidth,3,string)
+     call legendline(0.7,0.9,258,'!Aw!@!di!d='//string(1:iwidth))
+     !     call polyline(kik,Fpnp(ip,:),nk)
+     call dashset(2)
+     call color(3)
+     call polyline(kik/imag(omega),(psistep*max(ip-1.,0.02)*kik)**2*128/315/so,nk)
+     call color(15)
+     call dashset(0)
+  enddo
+  call jdrwstr(wx2nx(0.),wy2ny(1.05*(Ftnp(np,1)+Fpnp(np,1))),'!Ay!@=',-1.)
+  call dashset(2)
+  call color(3)
+  call legendline(.05,.06,0,' !BF!dE!d!@ (/!Aw!@!u2!u)')
+  call dashset(0)
+  call pltend
+  
 end program main

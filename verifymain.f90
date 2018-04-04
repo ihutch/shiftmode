@@ -32,13 +32,12 @@ program main
         write(*,'(3i4,7f8.4)')nx,ne,nvy,xL,pL,real(omega),imag(omega),k,psi,beta
      !  call passingdiags
         idebug=0
-!        call dentcalc2()
         call FpVyint()
         idebug=0
         Fcpassing(ik)=Fpasstotal
         call FtVyint()
         Ftrapped(ik)=Ftraptotal
-        write(*,'(f6.4,4es12.3)')k,Fcpassing(ik),Ftraptotal
+        write(*,'(a,f8.4,4es12.3)')' k,Fpass,Ftrap',k,Fcpassing(ik),Ftraptotal
         Ftnp(ip,ik)=real(Ftraptotal)/so
         Fpnp(ip,ik)=real(Fcpassing(ik))/so
      enddo

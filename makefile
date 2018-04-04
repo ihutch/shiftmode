@@ -66,4 +66,10 @@ $(ACCISX) : $(ACCISHOME)Makefile
 % : %.F$ (ACCISX) ;
 	$(FORTRAN)  -o $* $(COMPILE-SWITCHES) $*.F  $(LIBRARIES)
 
+bessmodsums : bessmodsums.f90 libmodbess.a ;
+	$(FORTRAN) -o bessmodsums $(COMPILE-SWITCHES) bessmodsums.f90 $(LIBRARIES) -L. -lmodbess
+
+libmodbess.a : bessmodIs.f
+	$(FORTRAN) -c bessmodIs.f
+	ar -crs libmodbess.a bessmodIs.o
 
