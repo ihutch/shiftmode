@@ -1,62 +1,78 @@
-! Given psi and k calculate the forces for a range of omegas.
-
-!include 'fhgfunc.f'
+! Given psi calculate the forces for a range of k and omegas.
+! Generalized to allow Omegac to be set too. 
 
 program main
   use shiftmode 
-  integer, parameter ::   nk=11
-  real :: kik(nk),omik(nk)
+  integer, parameter ::   nk=3
+  real :: kik(nk),omik(nk),omikm(nk)
   complex :: Fcpassing(nk),Ftrapped(nk)
+  real :: Fmpassing(nk),Fmtrapped(nk)
   integer, parameter :: np=20
 !  integer, parameter :: np=2
-  real, dimension(np,nk) :: Ftnp,Fpnp,omi
-  character*10 :: string
-  real :: omega0,omega1,oval
+  real, dimension(np,nk) :: Ftnp,Fpnp,omi,Fmtnp,Fmpnp
+!  character*10 :: string
+!  real :: omega0,omega1,oval
+  logical :: lcompare=.true.
   external forcebalance
-  psi=.02
-        call initialize
-! k-scan
-  akmax=0.3*sqrt(psi)
-  akmin=akmax/200.
-  write(*,*)'   k      omegai   Fpassing                Ftrapped'
-  do ik=1,nk
-     k=akmin+(ik-1.)*(akmax-akmin)/(max(nk-1.,1.))
-     kik(ik)=k
-     omegaimax=1.3*min(k,akmax/2.)
-     omik(ik)=0.
-     omega0=akmin
-     omega1=2.*k
-     nbi=10
-     call bisectroot(omega0,omega1,forcebalance,nbi,frac,oval)
-     write(*,*)'oval=',oval
-     omega=complex(0.,oval)
-     so=abs(omega**2)
-!     Ftnp(ip,ik)=real(Ftraptotal)/so
-!     Fpnp(ip,ik)=real(Fcpassing(ik))/so
+  psi=.1
+  Omegac=.09
 
-     if(.true.)then
+  call initialize
+! k-scan
+  akmax=0.1*sqrt(psi)
+  akmin=akmax/20.
+!  write(*,*)'   k      omegai   Fpassing                Ftrapped'
+  do ik=1,nk
+     k=max(akmin,(ik-1.)*akmax/(max(nk-1.,1.)))
+     kik(ik)=k
+     omegaimax=1.5*min(k,akmax/2.)
+     omik(ik)=0.
+     omikm(ik)=0.
+
      do ip=1,np  ! Iterate over omega.
-        omega=(0.,0.)+sqm1*(np+1-ip)*omegaimax/np
+        omega=(0.,0.)+sqm1*(np+0.5-ip)*omegaimax/np
         so=abs(omega**2)
-!        write(*,*)'nx, ne, nvy,   xL,    pL,   omegar,  omegai,     k     psi   beta'
-!        write(*,'(3i4,7f8.4)')nx,ne,nvy,xL,pL,real(omega),imag(omega),k,psi,beta
-        call FpVyint()
-        call FtVyint()
-        Fcpassing(ik)=Fpasstotal
-        Ftrapped(ik)=Ftraptotal
-        write(*,'(f6.4,5es12.3)')k,imag(omega),Fcpassing(ik),Ftraptotal
         omi(ip,ik)=imag(omega)
-        Ftnp(ip,ik)=real(Ftraptotal)/so
-        Fpnp(ip,ik)=real(Fcpassing(ik))/so
+        if(Omegac.gt.0.)then
+           call SumHarmonics()
+           Fmpassing(ik)=real(Fpasstotal)
+           Fmtrapped(ik)=real(Ftraptotal)
+           Fmtnp(ip,ik)=real(Fmtrapped(ik))/so
+           Fmpnp(ip,ik)=real(Fmpassing(ik))/so
+           if(lcompare)write(*,'(f6.4,3es12.3,i4)')k,imag(omega) &
+                ,Fmpnp(ip,ik),Fmtnp(ip,ik),nharmonics
+        endif
+
+        if(lcompare.or.Omegac.eq.0)then
+           call FpVyint()
+           call FtVyint()
+           Fcpassing(ik)=Fpasstotal
+           Ftrapped(ik)=Ftraptotal
+           Ftnp(ip,ik)=real(Ftrapped(ik))/so
+           Fpnp(ip,ik)=real(Fcpassing(ik))/so
+           write(*,'(f6.4,5es12.3)')k,imag(omega),Fpnp(ip,ik),Ftnp(ip,ik)
+        else
+           ! Always put a plausible calculation into the non-magnetic
+           Ftnp(ip,ik)=Fmtnp(ip,ik)
+           Fpnp(ip,ik)=Fmpnp(ip,ik)
+        endif
+
         if(ip.gt.1)then
-           if((Ftnp(ip,ik)+Fpnp(ip,ik))  &
-                *(Ftnp(ip-1,ik)+Fpnp(ip-1,ik)).le.0)then
-              omik(ik)=omi(ip,ik)
-              write(*,*)ip,Ftnp(ip,ik),Ftnp(ip-1,ik)
+           Fip=Ftnp(ip,ik)+Fpnp(ip,ik)
+           Fipm=Ftnp(ip-1,ik)+Fpnp(ip-1,ik)
+           if(Fip*Fipm.le.0)then
+              omik(ik)=(Fipm*omi(ip,ik)+Fip*omi(ip-1,ik))/(Fip+Fipm)
+              write(*,'(a,f8.4,a,f8.4)')'k=',k,' Intercept  at omegai=',omik(ik)
+           endif
+           Fip=Fmtnp(ip,ik)+Fmpnp(ip,ik)
+           Fipm=Fmtnp(ip-1,ik)+Fmpnp(ip-1,ik)
+           if(Fip*Fipm.le.0)then
+              omikm(ik)=(Fipm*omi(ip,ik)+Fip*omi(ip-1,ik))/(Fip+Fipm)
+              write(*,'(a,f8.4,a,f8.4,i3)')'k=',k,' Interceptm at omegai=',omikm(ik),nharmonics
            endif
         endif
+
      enddo
-     endif
   enddo
 
 !  write(*,*)'omik',omik
@@ -65,48 +81,52 @@ program main
   ik=nk
   call pfset(3)
   call multiframe(2,1,2)
-  call pltinit(0.,omi(1,nk),-.05,.05)
+  call pltinit(0.,omi(1,nk),-.2,.2)
+!  call pltinit(0.,omi(1,nk),-1.,1.)
   call axis()
-  call axlabels('omega','Normalized Force')
+  call axlabels(' ','Normalized Force')
   call winset(.true.)
+  call legendline(.8,.9,258,'F!dp!d')
+  call legendline(.5,.1,258,'F!dt!d')
   do ik=nk,1,-1
      call color(ik)
-     call polyline(omi(:,ik),Ftnp(:,ik),np)
-     call polyline(omi(:,ik),Fpnp(:,ik),np)
+        call dashset(2)
+        call polyline(omi(:,ik),Ftnp(:,ik),np)
+        call polyline(omi(:,ik),Fpnp(:,ik),np)
+        call dashset(0)
+     if(Omega.ne.0.and.lcompare)then
+        call polyline(omi(:,ik),Fmtnp(:,ik),np)
+        call polyline(omi(:,ik),Fmpnp(:,ik),np)
+     endif
   enddo
   call color(15)
 
-  call pltinit(0.,omi(1,nk),-1.,1.)
+  call pltinit(0.,omi(1,nk),-3.,3.)
   call axis()
-  call axlabels('omega','Normalized Force')
+  call axlabels('!Aw!B!di!d!@','Normalized Force')
   call winset(.true.)
   do ik=nk,1,-1
+     call dashset(2)
      call color(ik)
      call polyline(omi(:,ik),Ftnp(:,ik),np)
      call polyline(omi(:,ik),Fpnp(:,ik),np)
+     call dashset(0)
+     if(Omegac.ne.0..and.lcompare)then
+        call polyline(omi(:,ik),Fmtnp(:,ik),np)
+        call polyline(omi(:,ik),Fmpnp(:,ik),np)
+     endif
   enddo
   call pltend()
   call multiframe(0,0,0)
 
-  call autoplot(kik,omik,nk)
+  call autoplot(kik,omikm,nk)
+  call axlabels('k','omegai')
+  call dashset(1)
+  call polyline(kik,omik,nk)
+  call dashset(0)
   call pltend()
 
   stop
-  call pfset(3)
-  call pltinit(0.,np*psistep,-np*psistep*1.3,np*psistep*4.)
-  call axis
-  call axlabels('!Ay!@','Force !BF!dt!d , F!dp!d!@ (/!Aw!@!u2!u)')
-  do ik=1,nk
-     call polyline(psinp,Ftnp(:,ik),np)
-     call polyline(psinp,Fpnp(:,ik),np)
-     if(ik.eq.1)then
-        call jdrwstr(wx2nx(psinp(np/2)),wy2ny(Ftnp(np/2,ik)),'Trapped',-1.)
-     elseif(ik.eq.2)then
-        call jdrwstr(wx2nx(psinp(np/2)),wy2ny(Fpnp(np/2,ik)),'Passing',-1.)
-     endif
-     call fwrite(kik(ik),iwdth,4,string)
-     call jdrwstr(wx2nx(psinp(2*np/3)),wy2ny(Ftnp(2*np/3,ik)),string,1.)
-  enddo
    
 end program main
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!

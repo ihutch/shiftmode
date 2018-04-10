@@ -1,5 +1,5 @@
-! Verify the coding by comparing with f,g etc. At zero k, omega_r and
-! small omega_i for a range of psis.
+! Calculate for an array of k and psi the trapped and passing forces.
+! And F_E, and plot them for chosen omega_i, psimax, akmax, etc.
 
 include 'fhgfunc.f'
 
@@ -16,9 +16,11 @@ program main
   omega=(0.0,.001)
   psimax=1.
   psistep=psimax/(np-1)
-  !  akmax=2.5*imag(omega)
+!  akmax=3.*imag(omega)
   akmax=1.2*imag(omega)
   akmin=.000
+  flower=-.3
+  fupper=1.2
   so=-imag(omega)**2  ! equivalent.
   so=real(omega**2)   ! equivalent.
   ! so is a Negative quantity equal to omega**2, since omega_r=0.
@@ -88,9 +90,11 @@ program main
   !  call pltinit(-0.1*k,k,Fmin,Fmax)
   Fmax=Ftnp(np,1)+Fpnp(np,1)
   !  call pltinit(-0.1*k,k,-np*psistep*1.3,np*psistep*5.)
-  call pltinit(-0.1*k/imag(omega),k/imag(omega),-0.3*Fmax,1.1*Fmax)
+  call pltinit(-0.1*k/imag(omega),k/imag(omega),flower*Fmax,fupper*Fmax)
   call axis
-  call axlabels('!Bk!@/!Aw!@!di!d','Force !BF!dt!d+F!dp!d!@ (/!Aw!@!u2!u)')
+  call axis2
+  call axlabels('!Bkv!dt!A`!d!@/!Aw!@!di!d',  &
+       'Force !BF!dt!d+F!dp!d!@ (/!Aw!@!u2!u)')
   call winset(.true.)
   call polyline((/-0.1*k/imag(omega),k/imag(omega)/),(/0.,0./),2)
        
@@ -99,7 +103,7 @@ program main
      call polyline(kik/imag(omega),Ftnp(ip,:)+Fpnp(ip,:),nk)
      call jdrwstr(wx2nx(0.),wy2ny(Ftnp(ip,1)+Fpnp(ip,1)),string(1:iwidth),-1.)
      call fwrite(imag(omega),iwidth,3,string)
-     call legendline(0.7,0.9,258,'!Aw!@!di!d='//string(1:iwidth))
+     call legendline(0.5,0.94,258,'!Aw!@!di!d='//string(1:iwidth))
      !     call polyline(kik,Fpnp(ip,:),nk)
      call dashset(2)
      call color(3)
@@ -107,7 +111,7 @@ program main
      call color(15)
      call dashset(0)
   enddo
-  call jdrwstr(wx2nx(0.),wy2ny(1.05*(Ftnp(np,1)+Fpnp(np,1))),'!Ay!@=',-1.)
+  call jdrwstr(wx2nx(0.),wy2ny(1.1*(Ftnp(np,1)+Fpnp(np,1))),'!Ay!@=',-1.)
   call dashset(2)
   call color(3)
   call legendline(.05,.06,0,' !BF!dE!d!@ (/!Aw!@!u2!u)')

@@ -7,8 +7,11 @@ ACCISPARENT= $(HOME)/src/
 ACCISHOME=${ACCISPARENT}accis/
 ACCISX=$(ACCISHOME)libaccisX.a
 MODULES=shiftmode.o
-LIBRARIES = -L$(ACCISHOME) -laccisX -lX11
+LIBPATH= -L$(ACCISHOME) -L.
+LIBRARIES = -laccisX -lX11 -lmodbess
+LIBDEPS = $(ACCISHOME)libaccisX.a libmodbess.a
 COMPILE-SWITCHES = -Wall -O2
+# -fbounds-check
 #########################################################################
 ifeq ("$(FORTRAN)","")
 # Configure compiler. Mostly one long continued bash script.
@@ -29,20 +32,20 @@ endif
 export FORTRAN
 #########################################################################
  ACCISCHECK:=\
-$(shell echo >&2 "Checking accis library...";\
- if [ -f "${ACCISX}" ] ; then echo "Library ${ACCISX} exists."; else\
-   if [ -d "${ACCISPARENT}" ] ; then echo -n "src directory exists. ";\
+$(shell echo -n >&2 "Checking accis library ... ";\
+ if [ -f "${ACCISX}" ] ; then echo>&2 "Library ${ACCISX} exists."; else\
+   if [ -d "${ACCISPARENT}" ] ; then echo>&2 -n "src directory exists. ";\
      else mkdir ${ACCISPARENT} ; fi;\
-   if [ -d "${ACCISHOME}" ] ; then echo -n "accis directory exists. ";\
+   if [ -d "${ACCISHOME}" ] ; then echo>&2 -n "accis directory exists. ";\
      else cd ${ACCISPARENT};\
 	git clone git@github.com:ihutch/accis.git; cd - >/dev/null; fi;\
-   cd ${ACCISHOME}; make; cd - >/dev/null;\
-   if [ -f "${ACCISX}" ] ; then echo -n "Made ${ACCISX}";\
-     else echo "Error making ${ACCISX}"; fi;\
+   cd ${ACCISHOME}; make >&2; cd - >/dev/null;\
+   if [ -f "${ACCISX}" ] ; then echo>&2 "Made ${ACCISX}";\
+     else echo>&2 "Error making ${ACCISX}"; fi;\
  fi;\
 )
 #########################################################################
-default : $(ACCISX)
+default : $(LIBDEPS)
 	@echo "$(ACCISCHECK)"
 
 $(ACCISX) : $(ACCISHOME)Makefile
@@ -58,16 +61,13 @@ $(ACCISX) : $(ACCISHOME)Makefile
 	$(FORTRAN) -c $(COMPILE-SWITCHES) $*.F
 
 % : %.f $(ACCISX) ;
-	$(FORTRAN)  -o $* $(COMPILE-SWITCHES) $*.f  $(LIBRARIES)
+	$(FORTRAN)  -o $* $(COMPILE-SWITCHES) $*.f $(LIBPATH) $(LIBRARIES)
 
-% : %.f90  makefile $(ACCISX) $(MODULES);
-	$(FORTRAN)  -o $* $(COMPILE-SWITCHES) $*.f90 $(MODULES) $(LIBRARIES)
+% : %.f90  makefile $(ACCISX) $(MODULES) $(LIBDEPS);
+	$(FORTRAN)  -o $* $(COMPILE-SWITCHES) $*.f90 $(MODULES) $(LIBPATH) $(LIBRARIES)
 
 % : %.F$ (ACCISX) ;
-	$(FORTRAN)  -o $* $(COMPILE-SWITCHES) $*.F  $(LIBRARIES)
-
-bessmodsums : bessmodsums.f90 libmodbess.a ;
-	$(FORTRAN) -o bessmodsums $(COMPILE-SWITCHES) bessmodsums.f90 $(LIBRARIES) -L. -lmodbess
+	$(FORTRAN)  -o $* $(COMPILE-SWITCHES) $*.F  $(LIBPATH) $(LIBRARIES)
 
 libmodbess.a : bessmodIs.f
 	$(FORTRAN) -c bessmodIs.f
