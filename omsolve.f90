@@ -114,8 +114,9 @@ real function forcebalance(omega0,omega1,frac,omega2)
   omega=complex(0.,omega2)
   call FpVyint()
   call FtVyint()
-  forcebalance=real(Ftraptotal)+real(Fpasstotal)
-!  write(*,*)frac,omega2,forcebalance,forcebalance/(abs(Ftraptotal)+abs(Fpasstotal))
+  !  forcebalance=real(Ftraptotal)+real(Fpasstotal)
+  ! Include F_E :
+  forcebalance=real(Ftraptotal)+real(Fpasstotal)-(psi*k)**2*128./315.
 end function forcebalance
 
 include 'bisectroot.f' 

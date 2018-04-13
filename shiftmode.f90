@@ -3,8 +3,9 @@
 module shiftmode
   ! We use x in place of z, because x is real.
 !  integer, parameter :: nx=50, ne=60, nvy=200
-  integer, parameter :: nx=100, ne=30, nvy=50  !standard
+  integer, parameter :: nx=100, ne=50, nvy=50  !standard
 !  integer, parameter :: nx=20, ne=20, nvy=20   !low resolution
+!  integer, parameter :: nx=200, ne=400, nvy=40  ! fcontko
 !  integer, parameter :: nx=1000, ne=200, nvy=20  !PhiInt resolution
   real, parameter :: pi=3.1415926, sq2pi=sqrt(2.*3.1415926)
   real :: xL=20.,Emax=4.,vymax=4.            ! Hole length, Energy, v_y 
@@ -311,9 +312,9 @@ contains
     integer :: m,ncalc,ifirst
     data ifirst/0/
 ! How many harmonics do we need? Regard vymax as the velocity relative
-! to the thermal perpendicular speed.
+! to the thermal perpendicular speed. But don't allow less than +-4.
     nharmonics=9999    ! Default too large.
-    if(Omegac.gt.0)nharmonics=max(1,nint(k*vymax/Omegac))
+    if(Omegac.gt.0)nharmonics=max(4,nint(k*vymax/Omegac))
     if(.not.nharmonics.le.nvy-1)then   ! B-Field too low.
        if(mod(ifirst,20).eq.0)then
           write(*,'(a,i4,a,f6.4,a)')'Too many magnetized harmonics', &
