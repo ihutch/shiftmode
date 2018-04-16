@@ -16,7 +16,7 @@ program dFtdWs
   
   psi=0.16
   omegarmax=(nomegad/(nomegad-1.))*sqrt(psi)/2.
-  omegai=.01
+  omegai=.001
   call initialize
 
   do j=1,nomegad

@@ -4,7 +4,7 @@ module shiftmode
   ! We use x in place of z, because x is real.
   integer, parameter :: nx=50, ne=100, nvy=50  !standard
 !  integer, parameter :: nx=20, ne=20, nvy=20   !low resolution
-!  integer, parameter :: nx=50, ne=400, nvy=20  ! fcontko
+!  integer, parameter :: nx=50, ne=400, nvy=20  ! fcontko highres
   real, parameter :: pi=3.1415926, sq2pi=sqrt(2.*3.1415926)
   real :: xL=20.,Emax=4.,vymax=4.            ! Hole length, Energy, v_y 
   real :: psi=.1,pL=4.,k=.01, Ty=1.          ! psi, sech4width, k, Ty
