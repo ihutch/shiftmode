@@ -77,6 +77,7 @@ program main
      string=' '
      call fwrite(psi,width,2,string(2:))
      call legendline(xg,yg-.05*ip,0,string)
+     call accisflush()
   enddo
   call color(15)
   call dashset(0)

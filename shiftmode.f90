@@ -2,11 +2,9 @@
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 module shiftmode
   ! We use x in place of z, because x is real.
-!  integer, parameter :: nx=50, ne=60, nvy=200
-  integer, parameter :: nx=100, ne=50, nvy=50  !standard
+  integer, parameter :: nx=50, ne=100, nvy=50  !standard
 !  integer, parameter :: nx=20, ne=20, nvy=20   !low resolution
-!  integer, parameter :: nx=200, ne=400, nvy=40  ! fcontko
-!  integer, parameter :: nx=1000, ne=200, nvy=20  !PhiInt resolution
+!  integer, parameter :: nx=50, ne=400, nvy=20  ! fcontko
   real, parameter :: pi=3.1415926, sq2pi=sqrt(2.*3.1415926)
   real :: xL=20.,Emax=4.,vymax=4.            ! Hole length, Energy, v_y 
   real :: psi=.1,pL=4.,k=.01, Ty=1.          ! psi, sech4width, k, Ty
@@ -66,7 +64,7 @@ contains
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!  
 !Trapped particle routines. Can only be called after initialization.
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!  
-  subroutine dFdvpsidvy(vpsi,trapforce,tb,xlent)
+  subroutine dFdvpsidvy(vpsi,trapforce,tb,xlent)  ! Hacked.
     ! Calculate the past integral of tau vs x and L(tau) and
     ! phut(taut) vs x for a trapped particle of velocity vpsi at peak
     ! of potential. Return trapforce and orbit period tb These
@@ -78,34 +76,27 @@ contains
     real :: vpsi,tb,xlent
     complex :: trapforce
 
-    complex :: exptau,Ltemp,Ltint,Ltbb2,exptb,exptbb2,sumfactor,Ltfactor
+    complex :: exptau,Ltbb2,exptb,exptbb2,sumfactor,Ltfactor
     Wj=vpsi**2/2-psi
     if(Wj.gt.0)then
        write(*,*)'Positive energy in trapped particle code'
        return
     endif
-    vj=sqrt(-2.*Wj)
-    ! Determine the starting and ending nodes istart, iend for this
-    ! orbit given the previously calculated symmetric phi(x)-array.
-    do istart=1,nx/2
-       if(phi(istart).gt.-Wj)exit
-    enddo
-    ! Then remesh the orbit over just its actual x-extent.
-    xlent=abs(x(istart-2))
-    do j=1,3  ! Iterate the length determination if needed.
-       dxt=xlent*2./(nx-1.)                           ! Step size in x
-       xt=dxt*(/(i-1,i=1,nx)/)-xlent                  ! x-position array
-       phit=psi/cosh(xt/pL)**4                        ! Potential
-       phitprime=-psi*sinh(xt/pL)/cosh(xt/pL)**5*4/pL ! phi x-gradient
-       do istart=1,nx/2
-          if(phit(istart).gt.-Wj)exit
-       enddo
-       if(istart.lt.nx/4)then
-          exit
-       else
-          xlent=abs(xt(istart-2))
-       endif
-    enddo
+
+    
+    ! New Alternative Determine the starting node istart and remesh.
+    call orbitend(Wj,xm)
+    xlent=xm
+
+    ! 2.99 makes istart only just inside the orbit.
+    dxt=2.*xlent/(nx-2.99)  ! make array run from -xlen-r*dxt to xlen+r*dxt
+    xt=dxt*((/(i-1,i=1,nx)/)-(nx-1.)/2.)         ! x-position array
+    phit=psi/cosh(xt/pL)**4                        ! Potential
+    phitprime=-psi*sinh(xt/pL)/cosh(xt/pL)**5*4/pL ! phi x-gradient
+    istart=2  ! The first position that is inside the orbit.
+!    write(*,*)phitprime(1:2),phitprime(nx-1:nx)
+
+   
     iend=nx+1-istart
     if(istart.gt.nx/2)stop 'No steps on remeshed trapped orbit'    
     tau=0.
@@ -113,24 +104,20 @@ contains
     Lt=0.
     C=0.
     CapPhi=0.
-    dtauprior=0.
     ! Integrate to get tau and L(tau)
     v(istart)=sqrt(2.*(phit(istart)+Wj))
     tau(istart)=v(istart)/phitprime(istart) ! To get to v at accel phiprime.
     Ltfactor=exp(sqm1*omegad*tau(istart))
     Lt(istart)=-0.5*v(istart)*(1.-Ltfactor)/(omegad)
-    Ltint=exp(-sqm1*omegad*tau(istart))
     do i=istart+1,iend
        v(i)=sqrt(2.*(phit(i)+Wj))
        if(v(i).lt.0.7*vpsi)then    ! Use phiprime to determine step
           dtau=(v(i)-v(i-1))*2./(phitprime(i)+phitprime(i-1))
        else                        ! Use v to determine step. 
-          dtau=dxt*0.5*(v(i-1)+v(i))/(v(i-1)*v(i))
+          dtau=(xt(i)-xt(i-1))*0.5*(v(i-1)+v(i))/(v(i-1)*v(i))
        endif
        tau(i)=tau(i-1)+dtau
-       Ltfactor=exp(sqm1*omegad*(tau(i)-tau(i-1))) ! Current exponential
-       Ltemp=Ltint
-       Ltint=exp(-sqm1*omegad*tau(i)) ! Current exponential
+       Ltfactor=exp(sqm1*omegad*dtau) ! Current exponential
        vmean=(v(i)+v(i-1))/2.
 !       vmean=2./(1./v(i)+1./v(i-1))  ! makes no difference
        Lt(i)=Ltfactor*Lt(i-1)-vmean*(1.-Ltfactor)/(omegad)   ! New integral
@@ -159,20 +146,6 @@ contains
        trapforce=trapforce+sqm1*  &
        (CapPhi(i)*phitprime(i)+CapPhi(i-1)*phitprime(i-1))/2.*dtau*vpsi
     enddo
-    if(idebug.lt.-2)then
-       write(*,'(a,2i3,5f8.3)')'istart,iend,dxt,tbb2,sumfac' &
-            ,istart,iend,dxt,tbb2,sumfactor
-       write(*,*)'v'
-       write(*,'(10f8.4)')v
-       write(*,*)'xt'
-       write(*,'(10f8.4)')xt
-       write(*,*)'tau'
-       write(*,'(10f8.2)')tau
-       write(*,*)'imag(Lt)'
-       write(*,'(10f8.5)')imag(Lt)
-       write(*,*)'real(CapPhi)'
-       write(*,'(10f8.5)')real(CapPhi)
-    endif
   end subroutine dFdvpsidvy
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!  
   subroutine FtEint(Ftotal,dfperpdWperp,fperp)
@@ -346,6 +319,35 @@ contains
        Ftraptotal=Ftraptotal+2.*real(Ftrapvy(m+1))*EIm(m)
     enddo
   end subroutine SumHarmonics
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  subroutine orbitend(Wj,x0)
+    ! Find by bisection the turning point of the orbit whose energy is Wj.
+    ! That is where phi=-Wj. But we return the value below it: x0.
+    real :: Wj,xm,x1,x0,phim,phi0,phi1
+    nbi=20
+    x0=0
+    x1=xL
+    phi0=psi/cosh(x0/pL)**4+Wj
+    phi1=psi/cosh(x1/pL)**4+Wj
+    if(sign(1.,phi1).eq.sign(1.,phi0))then
+       write(*,*)'orbitend energies do not bracket zero',phi0,phi1
+       stop
+    endif
+    do i=1,nbi
+       xm=(x1+x0)/2.
+       phim=psi/cosh(xm/pL)**4+Wj
+! Which value to replace.
+       if(sign(1.,phim).eq.sign(1.,phi0))then
+          if(x0.eq.xm)exit ! should never happen
+          phi0=phim
+          x0=xm
+       else
+          if(x1.eq.xm)exit
+          phi1=phim
+          x1=xm
+       endif
+    enddo
+  end subroutine orbitend
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 end module shiftmode
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!

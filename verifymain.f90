@@ -54,7 +54,8 @@ program main
   call pfset(3)
   call pltinit(0.,np*psistep,-np*psistep*1.3,np*psistep*4.)
   call axis
-  call axlabels('!Ay!@','Force !BF!dt!d , F!dp!d!@ (/!Aw!@!u2!u)')
+  call axis2
+  call axlabels('!Ay!@','Force !BF!dt!d , F!dp!d!@ (/!Aw!@!u2!u!AD!@)')
   call winset(.true.)
   do ik=1,nk
      call polyline(psinp,Ftnp(:,ik),np)

@@ -13,11 +13,11 @@ program main
   real :: psinp(np),hnp(np),gnp(np),hmgnp(np),gjnp(np),pnp(np)
   real, dimension(np,nk) :: Ftnp,Fpnp
   character*10 :: string
-  omega=(0.0,.001)
+  omega=(0.0,.060)
   psimax=1.
   psistep=psimax/(np-1)
-!  akmax=3.*imag(omega)
-  akmax=1.2*imag(omega)
+  akmax=3.*imag(omega)
+!  akmax=1.2*imag(omega)
   akmin=.000
   flower=-.3
   fupper=1.2
@@ -62,7 +62,7 @@ program main
   call pfset(3)
   call pltinit(0.,np*psistep,-np*psistep*1.3,np*psistep*4.)
   call axis
-  call axlabels('!Ay!@','Force !BF!dt!d , F!dp!d!@ (/!Aw!@!u2!u)')
+  call axlabels('!Ay!@','Force !BF!dt!d , F!dp!d!@ (/!Aw!@!u2!u!AD!@)')
   call winset(.true.)
   do ik=1,nk
      call polyline(psinp,Ftnp(:,ik),np)
@@ -93,8 +93,8 @@ program main
   call pltinit(-0.1*k/imag(omega),k/imag(omega),flower*Fmax,fupper*Fmax)
   call axis
   call axis2
-  call axlabels('!Bkv!dt!A`!d!@/!Aw!@!di!d',  &
-       'Force !BF!dt!d+F!dp!d!@ (/!Aw!@!u2!u)')
+  call axlabels('!Bkv!dt!d/!Aw!@!di!d',  &
+       'Force !BF!dt!d+F!dp!d!@ (/!Aw!@!u2!u!AD!@)')
   call winset(.true.)
   call polyline((/-0.1*k/imag(omega),k/imag(omega)/),(/0.,0./),2)
        
