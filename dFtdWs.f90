@@ -1,10 +1,10 @@
-! Calculate PhiInt for a range of vparallel and omega'.
+! Calculate Ft contribution for a range of vparallel and omega'.
 
-program dphiint
+program dFtdWs
   use shiftmode
   implicit none
 
-  integer, parameter :: nomegad=5
+  integer, parameter :: nomegad=9
 
   complex :: PhiInt(ne,nomegad),Ft(ne,nomegad),Fomega(nomegad)
   integer :: i,j,iwidth,ip0,lentrim
@@ -16,7 +16,7 @@ program dphiint
   
   psi=0.16
   omegarmax=(nomegad/(nomegad-1.))*sqrt(psi)/2.
-  omegai=.004
+  omegai=.01
   call initialize
 
   do j=1,nomegad
@@ -55,6 +55,7 @@ program dphiint
   call pltinit(Wtscaled(ip0),Wtscaled(ne),pmin,pmax)
 !  call scalewn(Wtscaled(ip0),Wtscaled(ne),pmin,pmax,.true.,.false.)
   call axis
+  call axis2()
   call iwrite(iwpow,iwidth,string)
   call axlabels('(-W!d||!d)!u1/'//string(1:1)//'!u','!AJFf!@''!Bdz!@')
   call polyline((/Wtscaled(ip0),Wtscaled(ne)/),(/0.,0./),2)
@@ -81,29 +82,30 @@ else
   call minmax2(real(Ft),ne,ne,nomegad,pmin,pmax)
   call pltinit(Wtscaled(ip0),Wtscaled(ne),pmin,pmax)
   call axis
+  call axis2
   call iwrite(iwpow,iwidth,string)
   wvar='(-W!d||!d)!u1/'//string(1:1)//'!u'
   write(*,*)wvar
   call axlabels(wvar,'!BdF!dt!d/d!@'//wvar)
   call polyline((/Wtscaled(ip0),Wtscaled(ne)/),(/0.,0./),2)
-  call legendline(.05,1.-.05,258,'    !Aw!B!dr!d!@')
+  call legendline(.05,.48,258,'  !Aw!B!dr!d!@')
   do j=1,nomegad
      call color(j)
      call iwrite(j,iwidth,string)
      call labeline(Wtscaled(ip0),real(Ft(ip0:ne,j)),ne-ip0+1,string,iwidth)
      string(2:2)=' '
      call fwrite(omegar(j),iwidth,3,string(3:))
-     call legendline(.05,.95-.05*j,258,string)
+     call legendline(.05,.48-.05*j,258,string)
   enddo
   call color(15)
   string='!Aw!B!di!d!@='
   call fwrite(omegai,iwidth,3,string(lentrim(string)+1:))
-  call legendline(.05,.05,258,string)
+  call legendline(.05,.85,258,string)
   string='!Ay!@='
   call fwrite(psi,iwidth,2,string(lentrim(string)+1:))
-  call legendline(.05,.1,258,string)
+  call legendline(.05,.9,258,string)
   call pltend()
    
   endif
   
-end program dphiint
+end program dFtdWs
