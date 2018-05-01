@@ -22,7 +22,7 @@ To change parameters in the executables, edit the main programs.
 dFtdWs.f90, fcontko.f90, kpsiarraya.f90, omarray.f90, omsolve.f90 etc.
 The parameters declaring array sizes in shiftmode.f90 may need to be
 changed to get high resolution results. The main programs have not
-been tidied up; so beware.
+been tidied up so beware.
 
 The graphics library will be generated in ~/src/accis/ which needs to
 be creatable and writeable. Also libX11 needs to be linkable via -lX11
