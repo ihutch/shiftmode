@@ -2,55 +2,20 @@
 # This makefile should build on linux provided it has access to the X11 library
 # which typically requires the development package, a fortran compiler,
 # and git. It won't work on MSWindows.
-SHELL=/bin/bash
-ACCISPARENT= $(HOME)/src/
-ACCISHOME=${ACCISPARENT}accis/
-ACCISX=$(ACCISHOME)libaccisX.a
-MODULES=shiftmode.o
-LIBPATH= -L$(ACCISHOME) -L.
-LIBRARIES = -laccisX -lX11 -lmodbess
-LIBDEPS = $(ACCISHOME)libaccisX.a libmodbess.a
-COMPILE-SWITCHES = -Wall -O2
-# -fbounds-check
+# Decide the FORTRAN compiler and create the accis graphics routines:
+include ACCIS.mk
 #########################################################################
-ifeq ("$(FORTRAN)","")
-# Configure compiler. Mostly one long continued bash script.
-# Preference order mpif90, ftn, gfortran, f77
- FORTRAN:=\
-$(shell \
- if which mpif90 >/dev/null 2>&1; then echo -n "mpif90";else\
-  if which ftn >/dev/null 2>&1 ; then echo -n "ftn";else\
-    if which gfortran >/dev/null 2>&1; then echo -n "gfortran";else\
-     if which f77 >/dev/null 2>&1 ; then echo -n "f77";else\
-	echo "Unable to decide compiler. Specify via FORTRAN=..." >&2; exit 1;\
-     fi;\
-    fi;\
-  fi;\
- fi;\
-)
-endif
-export FORTRAN
-#########################################################################
- ACCISCHECK:=\
-$(shell echo -n >&2 "Checking accis library ... ";\
- if [ -f "${ACCISX}" ] ; then echo>&2 "Library ${ACCISX} exists."; else\
-   if [ -d "${ACCISPARENT}" ] ; then echo>&2 -n "src directory exists. ";\
-     else mkdir ${ACCISPARENT} ; fi;\
-   if [ -d "${ACCISHOME}" ] ; then echo>&2 -n "accis directory exists. ";\
-     else cd ${ACCISPARENT};\
-	git clone git@github.com:ihutch/accis.git; cd - >/dev/null; fi;\
-   cd ${ACCISHOME}; make >&2; cd - >/dev/null;\
-   if [ -f "${ACCISX}" ] ; then echo>&2 "Made ${ACCISX}";\
-     else echo>&2 "Error making ${ACCISX}"; fi;\
- fi;\
-)
-#########################################################################
-default : $(LIBDEPS)
-	@echo "$(ACCISCHECK)"
-
+# This dependency should be included in the application makefile.
 $(ACCISX) : $(ACCISHOME)Makefile
+	@echo "$(ACCISCHECK)"
 	cd $(ACCISHOME); make; cd -
-
+#########################################################################
+LIBRARIES := $(LIBRARIES) -lmodbess
+LIBDEPS := $(LIBDEPS) libmodbess.a
+#########################################################################
+MODULES=shiftmode.o
+#########################################################################
+# Patterns for compilation etc.
 %.o : %.f makefile ;
 	$(FORTRAN) -c $(COMPILE-SWITCHES) $*.f
 
@@ -60,16 +25,20 @@ $(ACCISX) : $(ACCISHOME)Makefile
 %.o : %.F makefile;
 	$(FORTRAN) -c $(COMPILE-SWITCHES) $*.F
 
-% : %.f $(ACCISX) ;
+% : %.f $(ACCISX) $(LIBDEPS);
 	$(FORTRAN)  -o $* $(COMPILE-SWITCHES) $*.f $(LIBPATH) $(LIBRARIES)
 
 % : %.f90  makefile $(ACCISX) $(MODULES) $(LIBDEPS);
 	$(FORTRAN)  -o $* $(COMPILE-SWITCHES) $*.f90 $(MODULES) $(LIBPATH) $(LIBRARIES)
 
-% : %.F$ (ACCISX) ;
+% : %.F$ (ACCISX) $(LIBDEPS);
 	$(FORTRAN)  -o $* $(COMPILE-SWITCHES) $*.F  $(LIBPATH) $(LIBRARIES)
-
+#########################################################################
+# A specific library of modified Bessel functions.
 libmodbess.a : bessmodIs.f
 	$(FORTRAN) -c bessmodIs.f
 	ar -crs libmodbess.a bessmodIs.o
+
+clean :
+	rm -f *.o *.mod omarray tbedoc verifymain kpsiarray? fcontko dFtdWs bessmodsums omsolve fhgfuncmain libmodbess.a
 

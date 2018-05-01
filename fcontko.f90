@@ -17,6 +17,7 @@ program main
 
   call initialize
   akmax=0.32             ! range of k/sqrt(psi)
+!  akmax=0.7             ! range of k/sqrt(psi)
   akmin=0.002            ! Lowest k plotted.
   omegaimax=0.08         ! range of omega/sqrt(psi)
   omegacmax=.8           ! Maximum fraction of Omegac/omega_b.
