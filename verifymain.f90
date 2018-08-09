@@ -9,18 +9,18 @@ program main
   real :: kik(nk)
   complex :: Fcpassing(nx),Ftrapped(nk)
   integer, parameter :: np=20
-!  integer, parameter :: np=2
+!  integer, parameter :: np=5
   real :: psinp(np),hnp(np),gnp(np),hmgnp(np),gjnp(np),pnp(np)
   real, dimension(np,nk) :: Ftnp,Fpnp
 !  character*10 :: string
-  psistep=.01
+  psistep=.01*20/np
   do ip=1,np  ! Iterate over psi.
      psi=psistep*ip
      psinp(ip)=psi
 ! k-scan disabled here because nk=1 use the minimum.
      akmax=sqrt(psi)/8.
-     akmin=.0000
-     write(*,*)'   k     Fpassing                Ftrapped'
+     akmin=.000
+!     write(*,*)'   k     Fpassing                Ftrapped'
      do ik=1,nk
         k=akmin+(ik-1.)*(akmax-akmin)/max(nk-1.,1.)
         kik(ik)=k
@@ -58,6 +58,8 @@ program main
   call axlabels('!Ay!@','Force !BF!dt!d , F!dp!d!@ (/!Aw!@!u2!u!AD!@)')
   call winset(.true.)
   do ik=1,nk
+!     write(*,*)ik,Ftnp(:,ik)
+!     write(*,*)ik,Fpnp(:,ik)
      call polyline(psinp,Ftnp(:,ik),np)
      call polyline(psinp,Fpnp(:,ik),np)
      if(ik.eq.1)then

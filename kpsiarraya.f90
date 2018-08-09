@@ -5,7 +5,7 @@ include 'fhgfunc.f'
 
 program main
   use shiftmode 
-  integer, parameter ::   nk=20
+  integer, parameter ::   nk=10
   real :: kik(nk)
   complex :: Fcpassing(nx),Ftrapped(nk)
   integer, parameter :: np=11
@@ -13,6 +13,8 @@ program main
   real :: psinp(np),hnp(np),gnp(np),hmgnp(np),gjnp(np),pnp(np)
   real, dimension(np,nk) :: Ftnp,Fpnp
   character*10 :: string
+
+  Ty=.2
   omega=(0.0,.001)
   psimax=1.
   psistep=psimax/(np-1)
@@ -65,15 +67,20 @@ program main
   call axlabels('!Ay!@','Force !BF!dt!d , F!dp!d!@ (/!Aw!@!u2!u!AD!@)')
   call winset(.true.)
   do ik=1,nk
+     call color(1)
      call polyline(psinp,Ftnp(:,ik),np)
-     call polyline(psinp,Fpnp(:,ik),np)
-     if(ik.eq.1)then
-        call jdrwstr(wx2nx(psinp(np/2)),wy2ny(Ftnp(np/2,ik)),'Trapped',-1.)
-     elseif(ik.eq.2)then
-        call jdrwstr(wx2nx(psinp(np/2)),wy2ny(Fpnp(np/2,ik)),'Passing',-1.)
-     endif
      call fwrite(kik(ik),iwdth,4,string)
      call jdrwstr(wx2nx(psinp(2*np/3)),wy2ny(Ftnp(2*np/3,ik)),string,1.)
+     call color(2)
+     call polyline(psinp,Fpnp(:,ik),np)
+     if(ik.eq.1)then
+        call color(1)
+        call jdrwstr(wx2nx(psinp(np/2)),wy2ny(Ftnp(np/2,ik)),'Trapped',-1.)
+        call jdrwstr(wx2nx(psinp(2*np/3)),wy2ny(Ftnp(2*np/3,ik))+.04,'k=',1.)
+     elseif(ik.eq.2)then
+        call color(2)
+        call jdrwstr(wx2nx(psinp(np/2)),wy2ny(Fpnp(np/2,ik)),'Passing',-1.)
+     endif
   enddo
   call color(3)
   call dashset(1)
@@ -90,7 +97,8 @@ program main
   !  call pltinit(-0.1*k,k,Fmin,Fmax)
   Fmax=Ftnp(np,1)+Fpnp(np,1)
   !  call pltinit(-0.1*k,k,-np*psistep*1.3,np*psistep*5.)
-  call pltinit(-0.1*k/imag(omega),k/imag(omega),flower*Fmax,fupper*Fmax)
+  call charsize(.018,.018)
+  call pltinit(-0.13*k/imag(omega),k/imag(omega),flower*Fmax,fupper*Fmax)
   call axis
   call axis2
   call axlabels('!Bkv!dt!d/!Aw!@!di!d',  &

@@ -6,10 +6,10 @@ module shiftmode
 !  integer, parameter :: nx=20, ne=20, nvy=20   !low resolution
 !  integer, parameter :: nx=50, ne=400, nvy=20  ! fcontko highres
   real, parameter :: pi=3.1415926, sq2pi=sqrt(2.*3.1415926)
-  real :: xL=20.,Emax=4.,vymax=4.            ! Hole length, Energy, v_y 
-  real :: psi=.1,pL=4.,k=.01, Ty=1.          ! psi, sech4width, k, Ty
+  real :: psi=.1,pL=4.,k=.01, Ty=1.         ! psi, sech4width, k, Ty
+  real :: xL=20.,Emax=4.,vymnorm=4.,vymax   ! Hole length, Energy, v_y 
   real :: beta                               ! inverse hole parallel temp.
-  complex :: omega=(0.0,.01)                  ! complex frequency
+  complex :: omega=(0.0,.01)                 ! complex frequency
   integer :: idebug=0
   complex :: omegad,sqm1=(0.,1.),Ftraptotal,Fpasstotal
   ! Position arrays
@@ -52,6 +52,7 @@ contains
     Wtscaled=(-Wt)**(1./iwpow)
     vpsiarray=sqrt(2.*(psi+Wt))
     ! vy-arrays
+    vymax=vymnorm*sqrt(Ty)
     dvy=vymax*2./(nvy-1.)                       ! vy-step
     vy=dvy*(/(i-1,i=1,nvy)/)-vymax              ! vy array.
     fy=exp(-vy**2/(2.*Ty))/sqrt(2.*pi*Ty)       ! fy Normalized Maxwellian
@@ -302,8 +303,9 @@ contains
     xit=k*sqrt(Ty)/Omegac
 ! Calculate the Integer[0.] exp*I[2] Bessel functions 0 to nharmonics
     call RIBESL(xit**2,0.,nharmonics+1,2,EIm,ncalc)
-    if(.not.ncalc.eq.nharmonics+1)then  ! All orders not calculated correctly.
-       write(*,*)'Bessel function imprecision',ncalc,' of',nharmonics+1
+    if(.not.ncalc.eq.nharmonics+1)then ! All orders not calculated correctly.  
+       write(*,'(a,i3,a,i3,a)')'Bessel functions',ncalc,' of',nharmonics+1, &
+       ' are precise. Others may be irrelevant.' 
     endif
 ! m=0 always used.! fy is Maxwellian hence the fywy,fy.
     omegad=omega

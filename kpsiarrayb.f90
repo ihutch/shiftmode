@@ -90,7 +90,8 @@ program main
   !  call pltinit(-0.1*k,k,Fmin,Fmax)
   Fmax=Ftnp(np,1)+Fpnp(np,1)
   !  call pltinit(-0.1*k,k,-np*psistep*1.3,np*psistep*5.)
-  call pltinit(-0.1*k/imag(omega),k/imag(omega),flower*Fmax,fupper*Fmax)
+  call pltinit(-0.13*k/imag(omega),k/imag(omega),flower*Fmax,fupper*Fmax)
+  call charsize(.018,.018)
   call axis
   call axis2
   call axlabels('!Bkv!dt!d/!Aw!@!di!d',  &

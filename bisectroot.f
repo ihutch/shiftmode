@@ -38,7 +38,7 @@
       ii=0
 !      write(*,*)'Starting func values',x0,fv0,x1,fv1
       if(sign(1.,fv0).eq.sign(1.,fv1))then
-         write(*,*)'No root',x0,fv0,x1,fv1
+         write(*,*)'x0,x1',x0,x1,' both f-signs',sign(1.,fv1)
          frac=-1.
 ! Disable sign crossing search.
          return

@@ -12,8 +12,9 @@ $(ACCISX) : $(ACCISHOME)Makefile
 #########################################################################
 LIBRARIES := $(LIBRARIES) -lmodbess
 LIBDEPS := $(LIBDEPS) libmodbess.a
+COMPILE-SWITCHES:=$(COMPILE-SWITCHES) -Wno-unused-dummy-argument
 #########################################################################
-MODULES=shiftmode.o
+MODULES=shiftmode.o acpath.o 
 #########################################################################
 # Patterns for compilation etc.
 %.o : %.f makefile ;
@@ -31,7 +32,7 @@ MODULES=shiftmode.o
 % : %.f90  makefile $(ACCISX) $(MODULES) $(LIBDEPS);
 	$(FORTRAN)  -o $* $(COMPILE-SWITCHES) $*.f90 $(MODULES) $(LIBPATH) $(LIBRARIES)
 
-% : %.F$ (ACCISX) $(LIBDEPS);
+% : %.F $(ACCISX) $(LIBDEPS);
 	$(FORTRAN)  -o $* $(COMPILE-SWITCHES) $*.F  $(LIBPATH) $(LIBRARIES)
 #########################################################################
 # A specific library of modified Bessel functions.
@@ -41,4 +42,5 @@ libmodbess.a : bessmodIs.f
 
 clean :
 	rm -f *.o *.mod omarray tbedoc verifymain kpsiarray? fcontko dFtdWs bessmodsums omsolve fhgfuncmain libmodbess.a
+
 

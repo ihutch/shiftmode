@@ -16,7 +16,7 @@ program dFtdWs
   
   psi=0.16
   omegarmax=(nomegad/(nomegad-1.))*sqrt(psi)/2.
-  omegai=.001
+  omegai=.01
   call initialize
 
   do j=1,nomegad
@@ -53,13 +53,22 @@ program dFtdWs
 
   call minmax2(real(PhiInt),ne,ne,nomegad,pmin,pmax)
   call pltinit(Wtscaled(ip0),Wtscaled(ne),pmin,pmax)
-!  call scalewn(Wtscaled(ip0),Wtscaled(ne),pmin,pmax,.true.,.false.)
+  !  call scalewn(Wtscaled(ip0),Wtscaled(ne),pmin,pmax,.true.,.false.)
+  call charsize(.018,.018)
   call axis
   call axis2()
   call iwrite(iwpow,iwidth,string)
   call axlabels('(-W!d||!d)!u1/'//string(1:1)//'!u','!AJFf!@''!Bdz!@')
   call polyline((/Wtscaled(ip0),Wtscaled(ne)/),(/0.,0./),2)
   call legendline(.05,1.-.05,258,'    !Aw!B!dr!d!@')
+  string='!Aw!B!di!d!@='
+  call fwrite(omegai,iwidth,3,string(lentrim(string)+1:))
+  call legendline(.05,.05,258,string)
+  string='!Ay!@='
+  call fwrite(psi,iwidth,2,string(lentrim(string)+1:))
+  call legendline(.05,.1,258,string)
+  call pltend()
+  call charsize(.015,.015)
   do j=1,nomegad
      call color(j)
      call iwrite(j,iwidth,string)
@@ -69,18 +78,12 @@ program dFtdWs
      call legendline(.05,.95-.05*j,258,string)
   enddo
   call color(15)
-  string='!Aw!B!di!d!@='
-  call fwrite(omegai,iwidth,3,string(lentrim(string)+1:))
-  call legendline(.05,.05,258,string)
-  string='!Ay!@='
-  call fwrite(psi,iwidth,2,string(lentrim(string)+1:))
-  call legendline(.05,.1,258,string)
-  call pltend()
 
 else
 
   call minmax2(real(Ft),ne,ne,nomegad,pmin,pmax)
   call pltinit(Wtscaled(ip0),Wtscaled(ne),pmin,pmax)
+  call charsize(.018,.018)
   call axis
   call axis2
   call iwrite(iwpow,iwidth,string)
@@ -89,6 +92,13 @@ else
   call axlabels(wvar,'!BdF!dt!d/d!@'//wvar)
   call polyline((/Wtscaled(ip0),Wtscaled(ne)/),(/0.,0./),2)
   call legendline(.05,.48,258,'  !Aw!B!dr!d!@')
+  string='!Aw!B!di!d!@='
+  call fwrite(omegai,iwidth,3,string(lentrim(string)+1:))
+  call legendline(.05,.85,258,string)
+  string='!Ay!@='
+  call fwrite(psi,iwidth,2,string(lentrim(string)+1:))
+  call legendline(.05,.9,258,string)
+  call charsize(.015,.015)
   do j=1,nomegad
      call color(j)
      call iwrite(j,iwidth,string)
@@ -98,12 +108,6 @@ else
      call legendline(.05,.48-.05*j,258,string)
   enddo
   call color(15)
-  string='!Aw!B!di!d!@='
-  call fwrite(omegai,iwidth,3,string(lentrim(string)+1:))
-  call legendline(.05,.85,258,string)
-  string='!Ay!@='
-  call fwrite(psi,iwidth,2,string(lentrim(string)+1:))
-  call legendline(.05,.9,258,string)
   call pltend()
    
   endif
