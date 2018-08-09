@@ -7,9 +7,10 @@ module shiftmode
 !  integer, parameter :: nx=50, ne=400, nvy=20  ! fcontko highres
   real, parameter :: pi=3.1415926, sq2pi=sqrt(2.*3.1415926)
   real :: psi=.1,pL=4.,k=.01, Ty=1.         ! psi, sech4width, k, Ty
-  real :: xL=20.,Emax=4.,vymnorm=4.,vymax   ! Hole length, Energy, v_y 
-  real :: beta                               ! inverse hole parallel temp.
-  complex :: omega=(0.0,.01)                 ! complex frequency
+  real :: xL=20.,Emax=4.,vymnorm=4.,vymax   ! Hole length, Energy, v_y
+  real :: vdrift=0.                         ! Shift of f(v) in hole frame.
+  real :: beta                              ! inverse hole parallel temp.
+  complex :: omega=(0.0,.01)                ! complex frequency
   integer :: idebug=0
   complex :: omegad,sqm1=(0.,1.),Ftraptotal,Fpasstotal
   ! Position arrays
@@ -20,6 +21,8 @@ module shiftmode
   ! Energy arrays
   integer :: iwpow=2
   real :: de,E(ne),vinfarray(ne),dvinf,fe0(ne),fe0de(ne) ! Passing orbits
+  real :: vinfneg(ne),fe0neg(ne),fe0deneg(ne)! Negative velocity passing.
+  real :: Eplus(ne),Eminus(ne)
   real :: Wt(ne),Wtscaled(ne),vpsiarray(ne)  ! Trapped orbit energies etc.
   real :: xlen(ne),tbe(ne)                   ! Trapped orbit length, period.
   complex :: fte(nx,0:ne)
@@ -44,9 +47,15 @@ contains
     vinfmax=sqrt(2.*Emax)      ! The uppermost orbit
     dvinf=vinfmax/ne           ! Use steps of constant vinf spacing.
     vinfarray=dvinf*(/(i-0.5,i=1,ne)/)  ! vinf array 
-    E=vinfarray**2/2.
-    fe0=exp(-E)/sq2pi ! Normalized Maxwellian with unit temperature.
-    fe0de=-fe0   ! Derivative wrt E is minus the same.
+    vinfneg=-vinfarray                  ! negative velocity
+    E=vinfarray**2/2.                   ! Energy in hole frame.
+    Eplus=(vinfarray-vdrift)**2/2.      ! Energy in Maxwellian rest frame.
+    Eminus=(vinfneg-vdrift)**2/2.
+    fe0=exp(-Eplus)/sq2pi     ! Normalized Maxwellian with unit temperature.
+    fe0de=-fe0*(1-vdrift/vinfarray)     ! Derivative wrt E.
+    fe0neg=exp(-Eminus)/sq2pi ! Normalized Maxwellian with unit temperature.
+    fe0deneg=-fe0neg*(1-vdrift/vinfneg) ! Derivative wrt E.
+!    write(*,'(3f8.4)')(E(i),fe0de(i),fe0deneg(i),i=1,ne)
     ! vpsi arrays
     Wt=-psi*(/((i-0.5)/ne,i=1,ne)/)**iwpow
     Wtscaled=(-Wt)**(1./iwpow)
@@ -65,7 +74,7 @@ contains
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!  
 !Trapped particle routines. Can only be called after initialization.
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!  
-  subroutine dFdvpsidvy(vpsi,trapforce,tb,xlent)  ! Hacked.
+  subroutine dFdvpsidvy(vpsi,trapforce,tb,xlent)
     ! Calculate the past integral of tau vs x and L(tau) and
     ! phut(taut) vs x for a trapped particle of velocity vpsi at peak
     ! of potential. Return trapforce and orbit period tb These
@@ -185,9 +194,8 @@ contains
        endif
        ! Ftrap(i) becomes the contribution to F from this energy.
        Ftrap(i)=Ftrap(i)*(omegad*dfe-(omegad-omega)*dfeperp)*dvpsi
-       Ftotal=Ftotal+2.*Ftrap(i)       ! Add to Ftotal integral. 
-       ! We do not multiply by vpsi because that was done in dFdvpsidvy.
-       ! But we multiply by 2. to account for \pm v_\psi.
+       ! Multiply by 2. to account for \pm v_\psi.
+       Ftotal=Ftotal+2.*Ftrap(i)       ! Add to Ftotal integral.
     enddo
   end subroutine FtEint
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -213,7 +221,8 @@ contains
   ! and vinf. This has to be integrated f(vinf,vy) dvinf dvy. The
   ! contributions to force are proportional to df/dW_parallel and
   ! df/dW_perp evaluated at these orbit energies but that scaling 
-  ! is now done externally
+  ! is now done externally. vinf and v are positive in this calculation.
+  ! So one should pass it vinfarray NOT vinfneg.   
     real    :: vinf
     complex :: passforce
     complex :: expdtau
@@ -258,9 +267,17 @@ contains
        ! No factor q_e has been applied to CapPhi, so no q_e factor here.
        Ftotal=Ftotal+passforce*dvinf*(omegad*dfe-(omegad-omega)*dfeperp) 
     enddo
+    if(vdrift.eq.0.)then
 ! For stationary holes negative velocities just double the effective force
-! (Although non-zero hole speed would require this to be done differently.)
-    Ftotal=2.*Ftotal
+       Ftotal=2.*Ftotal
+    else                   ! Need to integrate over negative velocity.
+       do i=1,ne
+          dfe=fe0deneg(i)*fperp
+          dfeperp=fe0neg(i)*dfperpdWperp
+          call dFdvinfdvy(vinfarray(i),passforce)  ! Pass postive vinf.
+          Ftotal=Ftotal+passforce*dvinf*(omegad*dfe-(omegad-omega)*dfeperp) 
+       enddo
+    endif
   end subroutine FpEint
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   subroutine FpVyint()

@@ -14,7 +14,8 @@ program main
   real, dimension(np,nk) :: Ftnp,Fpnp
   character*10 :: string
 
-  Ty=.2
+  vdrift=0.
+  Ty=1.
   omega=(0.0,.001)
   psimax=1.
   psistep=psimax/(np-1)
