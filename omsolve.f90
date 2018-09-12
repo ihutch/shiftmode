@@ -1,34 +1,23 @@
 ! Given psi and k calculate the forces for a range of omegas.
 
-!include 'fhgfunc.f'
+include 'fhgfunc.f'
 
 program main
   use shiftmode 
   integer, parameter ::   nk=15
   real :: kik(nk),omik(nk)
 !  complex :: Fcpassing(nk),Ftrapped(nk)
-  integer, parameter :: np=7
+  !  integer, parameter :: np=7
+    integer, parameter :: np=5
   real, dimension(np,nk) :: Ftnp,Fpnp
   character*20 :: string
   real :: omega0,omega1,oval,omax,komax
-  external forcebalance
+  external forcebalance,growthlk
 
-  Ty=.3
+  Ty=0.01
   psimax=1.
-  call pfset(3)
-  call pltinit(0.,0.3*psimax/sqrt(Ty),0.,0.08/Ty**0.33)
-  call axis()
-  call axis2()
-  call axlabels('!Bk!@/!A)y!@','!Ag!@/!A)y!@')
-  call accisflush()
-  xg=.75
-  yg=.94
-  string='!Ay!@'
-  call legendline(xg,yg,257,string)
-  string='!BT!dy!d='
-  call fwrite(Ty,width,2,string(10:))
-  call legendline(.1,yg,257,string)
-  ovalmax=0.2*sqrt(psi)/sqrt(Ty) ! Guess at peak omegai
+  pgmax=1. ! Silence warnings.
+  ovalmax=0.2*sqrt(psi)/sqrt(Ty) ! Old Guess at peak omegai
   do ip=1,np
      decade=(ip-1)/3
      ipmod=mod(ip,3)
@@ -42,6 +31,27 @@ program main
      sqpsi=sqrt(psi)
      omax=-999.
      call initialize
+     if(ip.eq.1)then
+        pgmax=growthlk(psi,beta,Ty)
+        call pfset(3)
+        pkmax=0.3/sqrt(Ty)
+        ovalmax=pkmax*pgmax/4. ! Guess at peak omegai
+!        call pltinit(0.,pkmax,0.,0.08/Ty**0.33)
+        call pltinit(0.,pkmax,0.,pkmax*pgmax/4.)
+        call axis()
+        call axis2()
+        call axlabels('!Bk!@/!A)y!@','!Ag!@/!A)y!@')
+        call accisflush()
+        xg=.75
+        yg=.94
+        string='!Ay!@'
+        call legendline(xg,yg,257,string)
+        string='!BT!dy!d='
+        call fwrite(Ty,width,2,string(10:))
+        call legendline(.1,yg,257,string)
+        call polyline((/0.,.1/)*pkmax,(/0.,.1/)*pgmax*pkmax,2)
+        call polyline((/0.,.1/)*pkmax,(.0625,.0625),2)
+     endif
      ! k-scan
      akmax=0.3*sqrt(psi)/sqrt(Ty)
      akmin=akmax/100.
@@ -93,15 +103,14 @@ program main
      string=' '
      call fwrite(psi,width,2,string(2:))
      call legendline(xg,yg-.05*ip,0,string)
+     call dashset(0)
+     call polyline((/0.,.1/)*pkmax,(/0.,.1/)*growthlk(psi,beta,Ty)*pkmax,2)
      call accisflush()
   enddo
-  call color(15)
-  call dashset(0)
-  call polyline((/0.,.02/),(/0.,.02/),2)
-  call polyline((/0.,.02/),(.0625,.0625),2)
 !  call drcstr('1/16')
   call pltend()
 
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   stop
   call pfset(3)
   call pltinit(0.,np*psistep,-np*psistep*1.3,np*psistep*4.)
@@ -111,12 +120,12 @@ program main
      call polyline(psinp,Ftnp(:,ik),np)
      call polyline(psinp,Fpnp(:,ik),np)
      if(ik.eq.1)then
-        call jdrwstr(wx2nx(psinp(np/2)),wy2ny(Ftnp(np/2,ik)),'Trapped',-1.)
+        call jdrwstr(wx2nx(psinp(np/2+1)),wy2ny(Ftnp(np/2+1,ik)),'Trapped',-1.)
      elseif(ik.eq.2)then
-        call jdrwstr(wx2nx(psinp(np/2)),wy2ny(Fpnp(np/2,ik)),'Passing',-1.)
+        call jdrwstr(wx2nx(psinp(np/2)+1),wy2ny(Fpnp(np/2+1,ik)),'Passing',-1.)
      endif
      call fwrite(kik(ik),iwdth,4,string)
-     call jdrwstr(wx2nx(psinp(2*np/3)),wy2ny(Ftnp(2*np/3,ik)),string,1.)
+     call jdrwstr(wx2nx(psinp(2*np/3+1)),wy2ny(Ftnp(2*np/3+1,ik)),string,1.)
   enddo
 
    

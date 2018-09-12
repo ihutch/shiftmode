@@ -26,11 +26,10 @@ program main
         kik(ik)=k
         omega=sqrt(psi)*(0.001+k/4.)*sqm1
         so=-imag(omega)**2
-        so=real(omega**2)   ! the same here.
+!        so=real(omega**2)   ! the same here.
         call initialize
         write(*,*)'nx, ne, nvy,   xL,    pL,   omegar,  omegai,     k     psi   beta'
         write(*,'(3i4,7f8.4)')nx,ne,nvy,xL,pL,real(omega),imag(omega),k,psi,beta
-     !  call passingdiags
         idebug=0
         call FpVyint()
         idebug=0
@@ -45,10 +44,10 @@ program main
      call fhgfunc(psi,20.,100,pL,gave,have,gjave,pint)
   
      hnp(ip)=have
-     gnp(ip)=gave
+     gnp(ip)=gave            !Trapped.
      gjnp(ip)=gjave
      pnp(ip)=-pint
-     hmgnp(ip)=(have-gave)
+     hmgnp(ip)=(have-gave)   !Passing.
   enddo
 
   call pfset(3)
@@ -75,10 +74,13 @@ program main
   call color(3)
   call dashset(1)
   call legendline(.65,.5,0.,'Analytic')
-  call polyline(psinp,gnp,np)
-  call polyline(psinp,hmgnp,np)
-  !     call polyline(psinp,gjnp,np) ! trapped force w/o boundary term
-  !     call polyline(psinp,pnp,np)  ! passing force w/o boundary term
+  call polyline(psinp,gnp,np)    ! This is trapped F_t
+  call polyline(psinp,hmgnp,np)  ! This is passing F_p
+!  call polyline(psinp,gjnp,np) ! trapped force w/o boundary term
+!  call polyline(psinp,pnp,np)  ! passing force w/o boundary term
+  write(*,*)' i   psi   Ft with without, Fp with boundary term'
+  write(*,*)'             g         gj    h-g  ' 
+  write(*,'(i3,4f8.4)')(i,psinp(i),gnp(i),gjnp(i),hmgnp(i),i=1,np)
   call dashset(0)
   call color(15)
   call pltend()

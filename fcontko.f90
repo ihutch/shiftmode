@@ -1,7 +1,8 @@
 ! Contour the force(s) over a domain of k and omegais.
 ! For psi and Omegac having some values.
+include 'fhgfunc.f'
 
-program main
+program fcontko
   use shiftmode 
   use acpath
   integer, parameter ::   nk=21
@@ -13,21 +14,18 @@ program main
   real :: zclv(20)
   character*30 string
   
-  psi=.5
-  Ty=.3
-  akmax=0.32/sqrt(Ty)    ! range of k/sqrt(psi)
+  psi=1
+  Ty=.1
+  call initialize
   akmin=0.002            ! Lowest k plotted.
-!  omegaimax=min(0.08/sqrt(Ty),.25)         ! range of omega/sqrt(psi)
-  omegaimax=0.08/Ty**.33 ! range of omega/sqrt(psi)
+  akmax=0.32/sqrt(Ty)    ! range of k/sqrt(psi)
+  slopelk=growthlk(psi,beta,Ty) ! Get the low-k analytic gamma-slope.
+  omegaimax=slopelk*akmax/4. ! Estimated range of omega/sqrt(psi)
   omegacmax=.8           ! Maximum fraction of Omegac/omega_b.
-  nioc=20                ! Number of omega cases.
+  nioc=20                 ! Number of omega cases.
   nfac=3                 ! Number devoted to logarithmic variation
   OmObdiv=.40            ! Pivot from log to linear
   dOm=.025               ! Spacing of linear contours
-! single contour case for testing
-!  OmObdiv=.66
-!  nioc=1
-!  nfac=1
   
   istable=0
   call pfset(3)
@@ -41,7 +39,7 @@ program main
   string='!BT!dy!d!@='
   call fwrite(Ty,iwidth,2, string(lentrim(string)+1:))
   call legendline(.8,.83,258,string)
-  call initialize
+  call polyline((/0.,.1/)*akmax,(/0.,.1/)*slopelk*akmax,2)
   do ioc=1,nioc
      OmOb=OmObdiv/2**(nfac-ioc)
      if(ioc.gt.nfac)OmOb=OmObdiv+  &
@@ -88,11 +86,11 @@ program main
      endif
      call accisflush()
      ! Testing the population of the contour arrays.
-     write(*,*)'iarray=',iarray,' cv=',cvacpath
+     write(*,*)'iarray=',iarray   !,' cv=',cvacpath
      write(*,'(i4,2f8.4)')(i,xcarray(i),ycarray(i),i=1,iarray)
      
   enddo
   write(*,*)'Finished'
   call pltend()
   
-end program main
+end program fcontko

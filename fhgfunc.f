@@ -109,3 +109,15 @@
          flattrap=flattrap+2.*vs*dz
       enddo
       end
+!*********************************************************************
+! Return the low-k growth rate for anisotropic temperature
+! normalized to k^2 T_parallel/m_e, for a schamel hole with trapped
+! "temperature" beta
+      real function growthlk(psi,beta,Ty)
+      xrn=10.
+      nx=101
+      xwidth=4.
+      call fhgfunc(psi,xrn,nx,xwidth,gint,hint,gjint,pint)
+      txoty=1/Ty
+      growthlk=sqrt(Ty*(((1-txoty)*hint+txoty*(1-1/beta)*gint))/hint)
+      end
