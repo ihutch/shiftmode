@@ -9,23 +9,23 @@ program fcontko
   real :: kik(nk)
   integer, parameter :: no=20
   real :: oi(no)
-  real, dimension(nk,no) :: Ftnp,Fpnp,cworka,Fsum
+  real, dimension(nk,no) :: Ftnp,Fpnp,cworka,Fsum,FE
   integer :: icl,icsw,istable
   real :: zclv(20)
   character*30 string
   
-  psi=1
-  Ty=.1
+  psi=0.1
+  Ty=1.
   call initialize
   akmin=0.002            ! Lowest k plotted.
   akmax=0.32/sqrt(Ty)    ! range of k/sqrt(psi)
   slopelk=growthlk(psi,beta,Ty) ! Get the low-k analytic gamma-slope.
   omegaimax=slopelk*akmax/4. ! Estimated range of omega/sqrt(psi)
   omegacmax=.8           ! Maximum fraction of Omegac/omega_b.
-  nioc=20                 ! Number of omega cases.
-  nfac=3                 ! Number devoted to logarithmic variation
-  OmObdiv=.40            ! Pivot from log to linear
-  dOm=.025               ! Spacing of linear contours
+  nioc=20                ! Number of Omegac cases.
+  nfac=4                 ! Number devoted to logarithmic variation
+  OmObdiv=.48            ! Pivot from log to linear
+  dOm=.02                ! Spacing of linear contours
   
   istable=0
   call pfset(3)
@@ -57,10 +57,11 @@ program fcontko
            omega=(0.,0.)+sqm1*oi(io)*sqrt(psi)
            so=abs(omega**2)
            call SumHarmonics()
-           Fpnp(ik,io)=real(Fpasstotal)/so
-           Ftnp(ik,io)=real(Ftraptotal)/so
-           !        Fsum(ik,io)=Fpnp(ik,io)+Ftnp(ik,io) ! Without F_E.
-           Fsum(ik,io)=Fpnp(ik,io)+Ftnp(ik,io)-(psi*k)**2*128./315.
+           Fpnp(ik,io)=real(Fpasstotal)
+           Ftnp(ik,io)=real(Ftraptotal)
+           FE(ik,io)=(psi*k)**2*128./315.
+           Fsum(ik,io)=(Fpnp(ik,io)+Ftnp(ik,io)-FE(ik,io))
+!           write(*,*)oi(io),Fpnp(ik,io),Ftnp(ik,io),FE(ik,io)
         enddo
      enddo
   

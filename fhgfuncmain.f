@@ -3,7 +3,7 @@
       include 'fhgfunc.f'
 
       program fhgvfuncmain
-      parameter (nz=101,npsi=40,nw=100,psimax=.4,zlen=20.,pi=3.1415926)
+      parameter (nz=101,npsi=40,nw=100,psimax=1.,zlen=20.,pi=3.1415926)
 !      real phi(nz),z(nz)
       real psi(npsi),ptrap(npsi),fptrap(npsi),gint(npsi),hint(npsi)
       real gjint(npsi),pint(npsi)
@@ -46,7 +46,8 @@
       call pltend()
 
       
-
-
-
+      write(*,*)'Integrated h            g              gj            p'
+     $     ,' at psi=',psimax
+      write(*,*)hint(npsi),gint(npsi),gjint(npsi),pint(npsi)
+      
       end

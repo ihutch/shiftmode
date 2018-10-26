@@ -254,7 +254,7 @@ contains
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   subroutine FpEint(Ftotal,dfperpdWperp,fperp)
     ! Integrate over vinf (v_parallel) to get passing force for specified v_y,
-    ! passing particles. (So far) only positive velocity direction, doubled.
+    ! passing particles.
     complex :: Ftotal
     real :: dfperpdWperp,fperp
     real :: dfe,dfeperp
@@ -305,7 +305,7 @@ contains
 ! How many harmonics do we need? Regard vymax as the velocity relative
 ! to the thermal perpendicular speed. But don't allow less than +-4.
     nharmonics=9999    ! Default too large.
-    if(Omegac.gt.0)nharmonics=max(4,nint(k*vymax/Omegac))
+    if(Omegac.gt.0)nharmonics=max(4,nint(abs(k*vymax)/Omegac))
     if(.not.nharmonics.le.nvy-1)then   ! B-Field too low.
        if(mod(ifirst,20).eq.0)then
           write(*,'(a,i4,a,f6.4,a)')'Too many magnetized harmonics', &
@@ -334,8 +334,19 @@ contains
        omegad=omega+m*Omegac
        call FpEint(Fpassvy(m+1),-1./Ty,1.)
        call FtEint(Ftrapvy(m+1),-1./Ty,1.)
-       Fpasstotal=Fpasstotal+2.*real(Fpassvy(m+1))*EIm(m)
-       Ftraptotal=Ftraptotal+2.*real(Ftrapvy(m+1))*EIm(m)
+!       if(.false.)then
+       if(real(omega).eq.0)then   !Short cut.
+          Fpasstotal=Fpasstotal+2*real(Fpassvy(m+1))*EIm(m)
+          Ftraptotal=Ftraptotal+2*real(Ftrapvy(m+1))*EIm(m)
+       else      ! Full sum over plus and minus m.
+          Fpasstotal=Fpasstotal+Fpassvy(m+1)*EIm(m)
+          Ftraptotal=Ftraptotal+Ftrapvy(m+1)*EIm(m)
+          omegad=omega-m*Omegac
+          call FpEint(Fpassvy(m+1),-1./Ty,1.)
+          call FtEint(Ftrapvy(m+1),-1./Ty,1.)
+          Fpasstotal=Fpasstotal+Fpassvy(m+1)*EIm(m)
+          Ftraptotal=Ftraptotal+Ftrapvy(m+1)*EIm(m)
+       endif
     enddo
   end subroutine SumHarmonics
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
