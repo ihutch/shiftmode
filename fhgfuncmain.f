@@ -3,14 +3,17 @@
       include 'fhgfunc.f'
 
       program fhgvfuncmain
-      parameter (nz=101,npsi=40,nw=100,psimax=1.,zlen=20.,pi=3.1415926)
+      parameter (nz=101,npsi=80,nw=100,psimax=1.,zlen=20.,pi=3.1415926)
 !      real phi(nz),z(nz)
       real psi(npsi),ptrap(npsi),fptrap(npsi),gint(npsi),hint(npsi)
       real gjint(npsi),pint(npsi)
       real v(nw),fschamel(nw)
 
+      call pfset(3)
       s2pi=sqrt(2.*3.1415926)
       write(*,*)'  psi    beta  flattrap trapnum  ft-tn    gint   pint'
+     $     ,'     hint   gjint'
+      
       do j=npsi,1,-1
 !      j=1
          psi(j)=psimax*j/npsi
@@ -36,8 +39,8 @@
          endif
          ptrap(j)=trapnum(psi(j),beta,phiwidth)/s2pi
          write(*,'(f8.4,f8.3,$)')psi(j),beta
-         write(*,'(6f8.4)')fptrap(j),ptrap(j),fptrap(j)-ptrap(j),gint(j)    &
-     &        ,pint(j)
+         write(*,'(8f8.4)')fptrap(j),ptrap(j),fptrap(j)-ptrap(j),gint(j)    &
+     &        ,pint(j),hint(j),gjint(j)
       enddo
       call pltend()
       
@@ -45,9 +48,35 @@
       call axlabels('psi','trapnum')
       call pltend()
 
+      call pltinit(0.,psi(npsi),0.,float(nint(gjint(npsi)+0.5)))
+      call charsize(.018,.018)
+      call polyline(psi,gjint,npsi)
+      call polyline(psi,hint,npsi)
+      call axis
+      call axis2
+      call axlabels('!Ay!@','!BH=!AJ!Bhdx ,     J=!AJ!Bjdx')
+      call jdrwstr(wx2nx(psi(npsi/2)),wy2ny(hint(npsi/2)),'!BH!@',-4.)
+      call jdrwstr(wx2nx(psi(npsi/2)),wy2ny(gjint(npsi/2)),'!BJ!@',-3.)
+      call pltend()
+
       
       write(*,*)'Integrated h            g              gj            p'
      $     ,' at psi=',psimax
       write(*,*)hint(npsi),gint(npsi),gjint(npsi),pint(npsi)
+
+      do i=1,npsi
+         ptrap(i)=sqrt(psi(i)/hint(i)*16./3.)
+         gint(i)=16.*psi(i)/3.
+      enddo
       
+      call autoplot(psi,gint,npsi)
+      call axlabels('!Ay!@','H        16!Ay!@/3')
+      call polyline(psi,hint,npsi)
+      call pltend
+
+      call autoplot(psi,ptrap,npsi)
+      call axis2
+      call axlabels('!Ay!@','(16!Ay!@/3H)!u1/2!u')
+      call pltend
+
       end

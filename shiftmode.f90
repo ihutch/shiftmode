@@ -2,9 +2,10 @@
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 module shiftmode
   ! We use x in place of z, because x is real.
-  integer, parameter :: nx=50, ne=100, nvy=50  !standard
+!  integer, parameter :: nx=50, ne=100, nvy=50  !standard
 !  integer, parameter :: nx=20, ne=20, nvy=20   !low resolution
-!  integer, parameter :: nx=50, ne=400, nvy=20  ! fcontko highres
+!  integer, parameter :: nx=50, ne=400, nvy=30  ! fcontko highres
+  integer, parameter :: nx=300, ne=800, nvy=30  ! Scratch
   real, parameter :: pi=3.1415926, sq2pi=sqrt(2.*3.1415926)
   real :: psi=.1,pL=4.,k=.01, Ty=1.         ! psi, sech4width, k, Ty
   real :: xL=20.,Emax=4.,vymnorm=4.,vymax   ! Hole length, Energy, v_y
@@ -12,7 +13,7 @@ module shiftmode
   real :: beta                              ! inverse hole parallel temp.
   complex :: omega=(0.0,.01)                ! complex frequency
   integer :: idebug=0
-  complex :: omegad,sqm1=(0.,1.),Ftraptotal,Fpasstotal
+  complex :: omegad,sqm1=(0.,1.),Ftraptotal,Fpasstotal,Fsum
   ! Position arrays
   real :: dx
   real :: x(nx),phi(nx),phiprime(nx),tau(nx),v(nx)
@@ -184,7 +185,8 @@ contains
        ! calculate the force Ftrap for this dvpsi and dvy element:
        call dFdvpsidvy(vpsi,Ftrap(i),tbe(i),xlen(i))
        if(.not.(abs(Ftrap(i)).ge.0))then
-          write(*,*)'Ftrap NAN?',Ftrap(i),Wj,vpsi,dvpsi
+          write(*,*)'Ftrap NAN?',Ftrap(i),Wj,vpsi!,dvpsi
+          write(*,'(a,8f8.4)')' omega,k,Omegac=',omega,k,Omegac
           stop
        endif
        if(idebug.eq.-2)then
