@@ -143,15 +143,14 @@ contains
 ! Calculate CapPhi from L(i), and on the way integrate force round the orbit
     exptb=exp(sqm1*omegad*tb)
     exptbb2=exp(sqm1*omegad*tbb2)
-    sumfactor=1./(1.-exptb)
+    sumfactor=1./(1.-exptb) ! Not now used.
     trapforce=0.
     CapPhi=0.
 ! Form CapPhi as omegad*Lt, and the contribution to trapforce as
 ! \int sqm1*phitprime*(omega*dfe ...)*CapPhi  dtau vpsi
     do i=istart,iend
        exptau=exp(sqm1*omegad*tau(i))
-       CapPhi(i)=omegad*((1.-exptb)*Lt(i)+exptau*(exptbb2-1.)*Ltbb2) &
-            *sumfactor
+       CapPhi(i)=omegad*((1.-exptb)*Lt(i)+exptau*(exptbb2-1.)*Ltbb2)
 ! The dtau to be applied to this subsequent tau integral. 
        dtau=tau(i)-tau(i-1)
        trapforce=trapforce+sqm1*  &
@@ -163,7 +162,7 @@ contains
     ! Integrate over fe (trapped). Wj=vpsi^2/2-psi. So vpsi=sqrt(2(psi+Wj))
     ! We must use cells that fill the Wj range 0 to -psi.
     ! New version puts evaluations at ends of integration steps.
-    complex :: Ftotal,dFdvpsi,dFdvprev
+    complex :: Ftotal,dFdvpsi,dFdvprev,exptb,exptbprev
     if(idebug.eq.-2)then
        write(*,*)'FtEint',omegad,beta,dfperpdWperp
        write(*,*)'  vpsi   fe*s2pi            Ftrap       ' &
@@ -192,7 +191,12 @@ contains
           write(*,'(a,8f8.4)')' omega,k,Omegac=',omega,k,Omegac
           stop
        endif
-       if(i.eq.1)dFdvprev=dFdvpsi
+       exptb=exp(sqm1*omegad*tbe(i))
+!       write(*,*)i,'exptb',exptb
+       if(i.eq.1)then
+          dFdvprev=dFdvpsi
+          exptbprev=exptb
+       endif
        if(idebug.eq.-2)then
           write(*,'(2f8.4,a,2es12.4,a,f8.3,f9.5,es12.4)')vpsi&
                ,fe*sqrt(2.*pi) &
@@ -200,7 +204,10 @@ contains
        endif
        ! Ftrap(i) becomes the contribution to F from this step.
        Ftrap(i)=0.5*(dFdvpsi*(omegad*dfe-(omegad-omega)*dfeperp) &
-            +dFdvprev*(omegad*dfeprev-(omegad-omega)*dfeperpprev))*dvpsi
+        /(1-exptb)&
+        +dFdvprev*(omegad*dfeprev-(omegad-omega)*dfeperpprev) &
+        /(1-exptbprev)  &
+        )*dvpsi
        ! Multiply by 2. to account for \pm v_\psi.
        Ftotal=Ftotal+2.*Ftrap(i)       ! Add to Ftotal integral.
        vpsiprev=vpsi
@@ -208,6 +215,7 @@ contains
        dFdvprev=dFdvpsi
        dfeprev=dfe
        dfeperpprev=dfeperp
+       exptbprev=exptb
     enddo
     ! Calculate end by extrapolation.
     Ftrap(ne)=Ftrap(ne-1)+0.5*(Ftrap(ne-1)-Ftrap(ne-2))/dvpsi*vpsi
@@ -252,6 +260,7 @@ contains
        endif
        ! Ftrap(i) becomes the contribution to F from this energy.
        Ftrap(i)=Ftrap(i)*(omegad*dfe-(omegad-omega)*dfeperp)*dvpsi
+       Ftrap(i)=Ftrap(i)/(1-exp(sqm1*omegad*tbe(i))) ! From subfactor
        ! Multiply by 2. to account for \pm v_\psi.
        Ftotal=Ftotal+2.*Ftrap(i)       ! Add to Ftotal integral.
     enddo
