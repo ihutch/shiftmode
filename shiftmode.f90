@@ -160,9 +160,65 @@ contains
   end subroutine dFdvpsidvy
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!  
   subroutine FtEint(Ftotal,dfperpdWperp,fperp)
+    ! Integrate over fe (trapped). Wj=vpsi^2/2-psi. So vpsi=sqrt(2(psi+Wj))
+    ! We must use cells that fill the Wj range 0 to -psi.
+    ! New version puts evaluations at ends of integration steps.
+    complex :: Ftotal,dFdvpsi,dFdvprev
+    if(idebug.eq.-2)then
+       write(*,*)'FtEint',omegad,beta,dfperpdWperp
+       write(*,*)'  vpsi   fe*s2pi            Ftrap       ' &
+         ,'       tb     dvpsi    dFtotal'
+       call pltinit(-12.,12.,-8.,8.)
+       call axis()
+    endif
+!    iwpow=2         ! Equal W spacing is ipow=1
+    Ftotal=0.
+    Wjprev=0.
+    feprev=1/sqrt(2.*pi)
+    dfeprev=-beta*feprev*fperp
+    dfeperpprev=feprev*dfperpdWperp
+    vpsiprev=sqrt(2.*psi)
+    do i=1,ne-1
+       Wj=psi*(-(float(i)/ne)**iwpow)
+       fe=exp(-beta*Wj)/sqrt(2.*pi) ! Normalized f_\parallel
+       dfe=-beta*fe*fperp           ! df_||/dW_||
+       dfeperp=fe*dfperpdWperp      ! df/dW_perp
+       vpsi=sqrt(2.*(psi+Wj))
+       dvpsi=vpsiprev-vpsi
+       ! calculate the force dFdvpsi for this vpsi and dvy element:
+       call dFdvpsidvy(vpsi,dFdvpsi,tbe(i),xlen(i))
+       if(.not.(abs(dFdvpsi).ge.0))then
+          write(*,*)'dFdvpsi NaN?',dFdvpsi,Wj,vpsi,dvpsi
+          write(*,'(a,8f8.4)')' omega,k,Omegac=',omega,k,Omegac
+          stop
+       endif
+       if(i.eq.1)dFdvprev=dFdvpsi
+       if(idebug.eq.-2)then
+          write(*,'(2f8.4,a,2es12.4,a,f8.3,f9.5,es12.4)')vpsi&
+               ,fe*sqrt(2.*pi) &
+               ,' (',Ftrap(i),')',tbe(i),dvpsi,real(Ftrap(i))*dvpsi
+       endif
+       ! Ftrap(i) becomes the contribution to F from this step.
+       Ftrap(i)=0.5*(dFdvpsi*(omegad*dfe-(omegad-omega)*dfeperp) &
+            +dFdvprev*(omegad*dfeprev-(omegad-omega)*dfeperpprev))*dvpsi
+       ! Multiply by 2. to account for \pm v_\psi.
+       Ftotal=Ftotal+2.*Ftrap(i)       ! Add to Ftotal integral.
+       vpsiprev=vpsi
+       feprev=fe
+       dFdvprev=dFdvpsi
+       dfeprev=dfe
+       dfeperpprev=dfeperp
+    enddo
+    ! Calculate end by extrapolation.
+    Ftrap(ne)=Ftrap(ne-1)+0.5*(Ftrap(ne-1)-Ftrap(ne-2))/dvpsi*vpsi
+    Ftotal=Ftotal+2.*Ftrap(i)*vpsi
+  end subroutine FtEint
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!  
+  subroutine FtEintOld(Ftotal,dfperpdWperp,fperp)
   ! Here we need to iterate over fe (trapped). Wj=vpsi^2/2-psi. So
   ! vpsi=sqrt(2(psi+Wj)) We must use cells that fill the Wj range 0 to
-  ! -psi. 
+  ! -psi. Old version with evaluations in centers of cells.
     complex :: Ftotal
     Ftotal=0.
     if(idebug.eq.-2)then
@@ -199,7 +255,7 @@ contains
        ! Multiply by 2. to account for \pm v_\psi.
        Ftotal=Ftotal+2.*Ftrap(i)       ! Add to Ftotal integral.
     enddo
-  end subroutine FtEint
+  end subroutine FtEintOld
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   subroutine FtVyint()
     ! Integrate (histogram) over vy to get Ftraptotal.
