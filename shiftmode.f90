@@ -231,7 +231,7 @@ contains
     real,parameter :: Sc=4,Rc=1/Sc
 
     ! Select the closest resonance.
-    el=2*int( (real(omegab(i))/real(omegad)-1)/2. )+1
+    el=2*int( (real(omegad)/real(omegab(i))-1)/2. )+1
     doel=real(omegab(i))-real(omegad)/el
     doel2=real(omegab(i))-real(omegad)/(el+2)
     if(abs(doel2).lt.abs(doel))then
@@ -241,7 +241,8 @@ contains
     ! Calculate the required omegab imaginary part.
     dob=real(omegab(i)-omegab(i-1))
     obi=-max(0.,dob/Rc-imag(omegad)/el)*max(0.,1.-(doel/(Sc*dob))**2)
-    if(obi.ne.0)write(*,*)i,sqrt(-Wt(i)),' obi',obi
+    !    write(*,*)i,el,doel,dob,obi
+    if(obi.ne.0)write(*,*)i,sqrt(-Wt(i)),el,' obi',obi
   end subroutine pathshift
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!  
   subroutine FtEintOld(Ftotal,dfperpdWperp,fperp)
