@@ -28,6 +28,7 @@ module shiftmode
   real :: xlen(ne),tbe(ne)                   ! Trapped orbit length, period.
   complex :: fte(nx,0:ne)
   complex :: Ftrap(ne)
+  complex :: omegab(0:ne),Fnonres(0:ne)
   ! vy arrays
   real :: vy(nvy),fy(nvy),fywy(nvy),dtaumax
   real :: dvy
@@ -163,6 +164,7 @@ contains
     ! We must use cells that fill the Wj range 0 to -psi.
     ! New version puts evaluations at ends of integration steps.
     complex :: Ftotal,dFdvpsi,dFdvprev,exptb,exptbprev
+    real :: obi
     if(idebug.eq.-2)then
        write(*,*)'FtEint',omegad,beta,dfperpdWperp
        write(*,*)'  vpsi   fe*s2pi            Ftrap       ' &
@@ -177,6 +179,7 @@ contains
     dfeprev=-beta*feprev*fperp
     dfeperpprev=feprev*dfperpdWperp
     vpsiprev=sqrt(2.*psi)
+    omegab(0)=0.
     do i=1,ne-1
        Wj=psi*(-(float(i)/ne)**iwpow)
        fe=exp(-beta*Wj)/sqrt(2.*pi) ! Normalized f_\parallel
@@ -191,17 +194,14 @@ contains
           write(*,'(a,8f8.4)')' omega,k,Omegac=',omega,k,Omegac
           stop
        endif
+       omegab(i)=2.*pi/tbe(i)
        exptb=exp(sqm1*omegad*tbe(i))
-!       write(*,*)i,'exptb',exptb
        if(i.eq.1)then
           dFdvprev=dFdvpsi
           exptbprev=exptb
        endif
-       if(idebug.eq.-2)then
-          write(*,'(2f8.4,a,2es12.4,a,f8.3,f9.5,es12.4)')vpsi&
-               ,fe*sqrt(2.*pi) &
-               ,' (',Ftrap(i),')',tbe(i),dvpsi,real(Ftrap(i))*dvpsi
-       endif
+       call pathshift(i,obi)
+!       omegab(i)=omegab(i)+sqm1*obi
        ! Ftrap(i) becomes the contribution to F from this step.
        Ftrap(i)=0.5*(dFdvpsi*(omegad*dfe-(omegad-omega)*dfeperp) &
         /(1-exptb)&
@@ -222,6 +222,27 @@ contains
     Ftotal=Ftotal+2.*Ftrap(i)
   end subroutine FtEint
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  subroutine pathshift(i,obi)
+! Calculate the required shift of the omegab path below the axis for this
+! mesh point.     
+    real :: obi
+    integer :: el
+    real :: doel,doel2,dob
+    real,parameter :: Sc=4,Rc=1/Sc
+
+    ! Select the closest resonance.
+    el=2*int( (real(omegab(i))/real(omegad)-1)/2. )+1
+    doel=real(omegab(i))-real(omegad)/el
+    doel2=real(omegab(i))-real(omegad)/(el+2)
+    if(abs(doel2).lt.abs(doel))then
+       el=el+2
+       doel=doel2
+    endif
+    ! Calculate the required omegab imaginary part.
+    dob=real(omegab(i)-omegab(i-1))
+    obi=-max(0.,dob/Rc-imag(omegad)/el)*max(0.,1.-(doel/(Sc*dob))**2)
+    if(obi.ne.0)write(*,*)i,sqrt(-Wt(i)),' obi',obi
+  end subroutine pathshift
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!  
   subroutine FtEintOld(Ftotal,dfperpdWperp,fperp)
   ! Here we need to iterate over fe (trapped). Wj=vpsi^2/2-psi. So
@@ -260,7 +281,7 @@ contains
        endif
        ! Ftrap(i) becomes the contribution to F from this energy.
        Ftrap(i)=Ftrap(i)*(omegad*dfe-(omegad-omega)*dfeperp)*dvpsi
-       Ftrap(i)=Ftrap(i)/(1-exp(sqm1*omegad*tbe(i))) ! From subfactor
+       Ftrap(i)=Ftrap(i)/(1-exp(sqm1*omegad*tbe(i))) ! From sumfactor
        ! Multiply by 2. to account for \pm v_\psi.
        Ftotal=Ftotal+2.*Ftrap(i)       ! Add to Ftotal integral.
     enddo
