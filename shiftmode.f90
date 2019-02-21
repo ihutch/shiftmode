@@ -218,8 +218,8 @@ contains
        exptbprev=exptb
     enddo
     ! Calculate end by extrapolation.
-    Ftrap(ne)=Ftrap(ne-1)+0.5*(Ftrap(ne-1)-Ftrap(ne-2))/dvpsi*vpsi
-    Ftotal=Ftotal+2.*Ftrap(i)*vpsi
+    Ftrap(ne)=Ftrap(ne-1)+0.5*(Ftrap(ne-1)-Ftrap(ne-2))
+    Ftotal=Ftotal+2.*Ftrap(i)
   end subroutine FtEint
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!  
