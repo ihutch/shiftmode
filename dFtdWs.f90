@@ -10,12 +10,12 @@ program dFtdWs
   integer :: j,iwidth,ip0,lentrim
   real :: omegarmax,omegar(nomegad),omegai
   real :: pmin,pmax
-  character*20 string
+  character*30 string
   character*20 wvar
   
   psi=0.16
-  omegarmax=(nomegad/(nomegad-1.))*sqrt(psi)/2.
-  omegai=.0001
+  omegarmax=-(nomegad/(nomegad-1.))*sqrt(psi)/2.
+  omegai=-.001
   call initialize
 
   do j=1,nomegad
@@ -44,7 +44,7 @@ program dFtdWs
   call polyline((/Wtscaled(ip0),Wtscaled(ne)/),(/0.,0./),2)
   call legendline(.05,.48,258,'  !Aw!B!dr!d!@')
   string='!Aw!B!di!d!@='
-  call fwrite(omegai,iwidth,3,string(lentrim(string)+1:))
+  call fwrite(omegai,iwidth,6,string(lentrim(string)+1:))
   call legendline(.05,.85,258,string)
   string='!Ay!@='
   call fwrite(psi,iwidth,2,string(lentrim(string)+1:))
@@ -57,6 +57,11 @@ program dFtdWs
      string(2:2)=' '
      call fwrite(omegar(j),iwidth,3,string(3:))
      call legendline(.05,.48-.05*j,258,string)
+     if(.true.)then
+        call dashset(2)
+        call polyline(Wtscaled(ip0),0.5*imag(Ft(ip0:ne,j)),ne-ip0+1)
+        call dashset(0)
+     endif
   enddo
   call color(15)
   call pltend()

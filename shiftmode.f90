@@ -5,7 +5,8 @@ module shiftmode
 !  integer, parameter :: nx=50, ne=100, nvy=50  !standard
 !  integer, parameter :: nx=20, ne=20, nvy=20   !low resolution
 !  integer, parameter :: nx=50, ne=400, nvy=30  ! fcontko highres
-  integer, parameter :: nx=300, ne=800, nvy=30  ! Scratch
+  integer, parameter :: nx=300, ne=800, nvy=30  ! Low omegai
+!  integer, parameter :: nx=300, ne=400, nvy=30  ! Low omegai
   real, parameter :: pi=3.1415926, sq2pi=sqrt(2.*3.1415926)
   real :: psi=.1,pL=4.,k=.01, Ty=1.         ! psi, sech4width, k, Ty
   real :: xL=20.,Emax=4.,vymnorm=4.,vymax   ! Hole length, Energy, v_y
@@ -163,7 +164,7 @@ contains
     ! Integrate over fe (trapped). Wj=vpsi^2/2-psi. So vpsi=sqrt(2(psi+Wj))
     ! We must use cells that fill the Wj range 0 to -psi.
     ! New version puts evaluations at ends of integration steps.
-    complex :: Ftotal,dFdvpsi,dFdvprev,exptb,exptbprev
+    complex :: Ftotal,dFdvpsi,dFdvprev,exptb,exptbprev,cdvpsi,dob
     real :: obi
     if(idebug.eq.-2)then
        write(*,*)'FtEint',omegad,beta,dfperpdWperp
@@ -180,6 +181,8 @@ contains
     dfeperpprev=feprev*dfperpdWperp
     vpsiprev=sqrt(2.*psi)
     omegab(0)=0.
+    Fnonres(0)=0.                 !Don't add zero energy point.
+    exptbprev=0.                  !Silence warnings
     do i=1,ne-1
        Wj=psi*(-(float(i)/ne)**iwpow)
        fe=exp(-beta*Wj)/sqrt(2.*pi) ! Normalized f_\parallel
@@ -195,19 +198,38 @@ contains
           stop
        endif
        omegab(i)=2.*pi/tbe(i)
-       exptb=exp(sqm1*omegad*tbe(i))
+       call pathshift(i,obi)
+       if(omegad.ne.omega.and.obi.ne.0)then
+!          write(*,'(a,i4,6f10.5)')'i,obi,omega,omegad',i,obi,omega,omegad
+!          obi=0.
+       endif
+       omegab(i)=omegab(i)+sqm1*obi
+       exptb=exp(sqm1*omegad*2*pi/omegab(i))
+       if(.not.abs(exptb).lt.1.e10)exptb=1.e10  ! Enable divide by infinity
        if(i.eq.1)then
           dFdvprev=dFdvpsi
           exptbprev=exptb
        endif
-       call pathshift(i,obi)
-!       omegab(i)=omegab(i)+sqm1*obi
-       ! Ftrap(i) becomes the contribution to F from this step.
-       Ftrap(i)=0.5*(dFdvpsi*(omegad*dfe-(omegad-omega)*dfeperp) &
-        /(1-exptb)&
-        +dFdvprev*(omegad*dfeprev-(omegad-omega)*dfeperpprev) &
-        /(1-exptbprev)  &
-        )*dvpsi
+       dob=omegab(i)-omegab(i-1)
+       cdvpsi=dvpsi*(1.+sqm1*imag(dob)/real(dob))
+       Fnonres(i)=dFdvpsi*(omegad*dfe-(omegad-omega)*dfeperp)
+       Fnonres(i)=Fnonres(i)+sqm1*real(Fnonres(i)-Fnonres(i-1))  &
+            /real(omegab(i)-omegab(i-1))*obi
+!       if(i.le.1)then  ! Hack to fix giant dFdvpsi problem.
+       if(tbe(i)*imag(omegad).lt.-4.)then ! Hack to fix giant dFdvpsi problem.
+          write(*,*)'drop',tbe(i),imag(omegad),dFdvpsi
+          Fnonres(i)=0.
+       endif
+       Ftrap(i)=0.5*(Fnonres(i)/(1.-exptb) &
+            +Fnonres(i-1)/(1.-exptbprev))*cdvpsi
+       if(.not.(abs(Ftrap(i)).ge.0))then
+          write(*,*)'Ftrap NAN?',i
+          write(*,*)Fnonres(i),Ftrap(i)
+          write(*,*)omegab(i-1),omegab(i)
+          write(*,*)omegad,omegad/omegab(i)
+          write(*,*)exptb,exptbprev
+          stop
+       endif
        ! Multiply by 2. to account for \pm v_\psi.
        Ftotal=Ftotal+2.*Ftrap(i)       ! Add to Ftotal integral.
        vpsiprev=vpsi
@@ -220,29 +242,44 @@ contains
     ! Calculate end by extrapolation.
     Ftrap(ne)=Ftrap(ne-1)+0.5*(Ftrap(ne-1)-Ftrap(ne-2))
     Ftotal=Ftotal+2.*Ftrap(i)
+    Fnonres(ne)=Fnonres(ne-1) !+0.5*(Fnonres(ne-1)-Fnonres(ne-2))
+    if(.false.)then
+    ! Diagnostic plots
+    call autoplot(real(omegab(1:ne)),real(Fnonres(1:ne)),ne)
+    call dashset(2)
+    call polyline(real(omegab(1:ne)),imag(Fnonres(1:ne)),ne)
+!    call dashset(0)
+!    call polyline(real(omegab(1:ne)),real(1.e3*Ftrap(1:ne)),ne)
+    call dashset(0)
+    call polyline(real(omegab),imag(.001/(1.-exp(sqm1*omegad*2.*pi/omegab))),ne)
+    call pltend()
+    endif
   end subroutine FtEint
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   subroutine pathshift(i,obi)
 ! Calculate the required shift of the omegab path below the axis for this
 ! mesh point.     
     real :: obi
-    integer :: el
+    integer :: el,ielsign
     real :: doel,doel2,dob
-    real,parameter :: Sc=4,Rc=1/Sc
+    real,parameter :: Sc=4,Rc=2./Sc
 
-    ! Select the closest resonance.
-    el=2*int( (real(omegad)/real(omegab(i))-1)/2. )+1
+    ! Select the closest odd resonance such that el*omegab=omegar
+    ielsign=int(sign(1.,real(omegad)))
+    el=(2*int( (abs(real(omegad))/real(omegab(i))-1)/2. )+1)*ielsign
     doel=real(omegab(i))-real(omegad)/el
-    doel2=real(omegab(i))-real(omegad)/(el+2)
+    doel2=real(omegab(i))-real(omegad)/(el+2*ielsign)
     if(abs(doel2).lt.abs(doel))then
-       el=el+2
+       el=el+2*ielsign
        doel=doel2
     endif
     ! Calculate the required omegab imaginary part.
     dob=real(omegab(i)-omegab(i-1))
-    obi=-max(0.,dob/Rc-imag(omegad)/el)*max(0.,1.-(doel/(Sc*dob))**2)
-    !    write(*,*)i,el,doel,dob,obi
-    if(obi.ne.0)write(*,*)i,sqrt(-Wt(i)),el,' obi',obi
+    obi=-ielsign*max(0.,dob/Rc-imag(omegad)/abs(el)) &
+         *max(0.,1.-(doel/(Sc*dob))**2)
+!    if(obi.ne.0.and.abs(el).lt.10)write(*,'(i4,f8.4,i5,f8.4,a,4f10.5)') &
+!         i,sqrt(-Wt(i)),el,real(omegab(i))/(real(omegad)/el) &
+!         ,' obi',obi,real(omegad-omega)/omegac,dob,doel
   end subroutine pathshift
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!  
   subroutine FtEintOld(Ftotal,dfperpdWperp,fperp)
