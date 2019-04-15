@@ -2,6 +2,16 @@
 ! as function of omegar and psi. 
 
 program lowfreq
+  use shiftmode
+  integer, parameter ::   nor=41,noi=1,nunconv=3
+  real :: or(nor),oi(noi),FE
+  complex, dimension(nor,noi) ::  omegacomplex,forcecomplex
+  complex, dimension(nor,noi) ::  Ftcomplex,Fpcomplex
+  real, dimension(nor,noi) :: cworka
+  integer :: icl
+  real :: zclv(20)
+  logical :: lplot2=.true.,lreadit=.false.
+  character*30 string,filename,argument
   real :: kp
 !  logical :: lcont=.false.,lplot=.false.
   logical :: lcont=.true.,lplot=.true.
@@ -22,25 +32,6 @@ program lowfreq
      ormax=psip**0.75*.07              ! High-B scaling
   endif
   Typ=1.
-
-  call fomegacont(psip,Omegacp,Typ,kp,lcont,lplot,err,omegap,ormax,oimax)
-
-end program lowfreq
-
-!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-subroutine fomegacont(psip,Omegacp,Typ,kp,lcont,lplot,err,omegap,ormax,oimax)
-  use shiftmode
-  complex :: omegap
-  integer, parameter ::   nor=41,noi=1,nunconv=3
-  real :: or(nor),oi(noi),FE,kp
-  complex, dimension(nor,noi) ::  omegacomplex,forcecomplex
-  complex, dimension(nor,noi) ::  Ftcomplex,Fpcomplex
-  real, dimension(nor,noi) :: cworka
-  integer :: icl
-  real :: zclv(20)
-  logical :: lcont,lplot,lplot2=.true.,lreadit=.false.
-  character*30 string,filename,argument
-  real ormax,oimax
 
   if(noi.eq.1)then
      lplot=.false.
@@ -249,5 +240,6 @@ subroutine fomegacont(psip,Omegacp,Typ,kp,lcont,lplot,err,omegap,ormax,oimax)
 !     call polyline(or,imag(-Fpcomplex(1,1))*(or/or(1))**1,nor)
      call pltend
   endif
+
+end program lowfreq
   
-end subroutine fomegacont
