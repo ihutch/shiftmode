@@ -59,8 +59,9 @@ contains
     fe0neg=exp(-Eminus)/sq2pi ! Normalized Maxwellian with unit temperature.
     fe0deneg=-fe0neg*(1-vdrift/vinfneg) ! Derivative wrt E.
 !    write(*,'(3f8.4)')(E(i),fe0de(i),fe0deneg(i),i=1,ne)
-    ! vpsi arrays
-    Wt=-psi*(/((i-0.5)/ne,i=1,ne)/)**iwpow
+    ! vpsi arrays changed to be consistent with linear interpolation
+!    Wt=-psi*(/((i-0.5)/ne,i=1,ne)/)**iwpow
+    Wt=-psi*(/(float(i)/ne,i=1,ne)/)**iwpow
     Wtscaled=(-Wt)**(1./iwpow)
     vpsiarray=sqrt(2.*(psi+Wt))
     ! vy-arrays
@@ -96,7 +97,6 @@ contains
        return
     endif
 
-    
     ! New Alternative Determine the starting node istart and remesh.
     call orbitend(Wj,xm)
     xlent=xm
@@ -215,7 +215,6 @@ contains
        Fnonres(i)=dFdvpsi*(omegad*dfe-(omegad-omega)*dfeperp)
        Fnonres(i)=Fnonres(i)+sqm1*real(Fnonres(i)-Fnonres(i-1))  &
             /real(omegab(i)-omegab(i-1))*obi
-!       if(i.le.1)then  ! Hack to fix giant dFdvpsi problem.
        if(tbe(i)*imag(omegad).lt.-4.)then ! Hack to fix giant dFdvpsi problem.
           write(*,*)'drop',tbe(i),imag(omegad),dFdvpsi
           Fnonres(i)=0.
