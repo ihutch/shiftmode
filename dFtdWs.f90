@@ -14,6 +14,7 @@ program dFtdWs
   character*30 string
   character*20 wvar
   logical :: limag=.true.
+  real :: pwr
   
   psi=.16
   omegarmax=(nomegad/max(nomegad-1.,1.))*sqrt(psi)/2.    *.1
@@ -76,30 +77,49 @@ program dFtdWs
   call pltend()
 
   ! Plot omega_b versus sqrt(-W)=Wtscaled.
-  call autoplot(Wtscaled(ip0),real(omegab(ip0:)),ne-ip0)
-  call axlabels(wvar,'!Aw!@!dbr!d')
+  call autoplot(Wtscaled/sqrt(psi),real(omegab)/sqrt(psi),ne)
+  call axlabels('(-W/!Ay!@)!u0.5!u','!Aw!@!dbr!d/!A)y!@')
+  call axis2
   string='!Ay!@='
   call fwrite(psi,iwidth,2,string(lentrim(string)+1:))
   call legendline(xleg,.9,258,string)
+  call winset(.true.)
+  call dashset(1)
+  ! Formula
+  pwr=0.45
+  call polyline(Wtscaled/sqrt(psi), &
+       sqrt(1/2.)/((sqrt(psi)/Wtscaled)**pwr+(sqrt(2.))**pwr-1.)**(1/pwr),ne)
+  call dashset(4)
+  call polyline(Wtscaled/sqrt(psi), &
+       Wtscaled/sqrt(2.*psi),ne)
+  call dashset(2)
+  call polyline(Wtscaled/sqrt(psi), &
+       (Wtscaled/(2.*sqrt(psi))),ne)
+!  call dashset(3)
+!  call polyline(Wtscaled/sqrt(psi), &
+!       (Wtscaled/sqrt(psi))**.89/2.,ne)
+  call dashset(0)
   call pltend
 
+  if(.false.)then
   call autoplot(vpsiarray(ip0),real(omegab(ip0:)),ne-ip0)
   call axlabels('v!d!Ay!@!d','!Aw!@!dbr!d')
   call pltend()
   
   do j=ip0,ne-ip0
-     dvdob(j)=(vpsiarray(j+1)-vpsiarray(j-1))/real(omegab(j+1)-omegab(j-1))
+     dvdob(j)=(vpsiarray(j+1)**2-vpsiarray(j-1)**2)/(real(omegab(j+1))**2-real(omegab(j-1))**2)
   enddo
-
   call autoplot(real(omegab(ip0:)),dvdob(ip0:),ne/2)
-  call axlabels('!Aw!@!dbr!d','dvdob')
+  call axlabels('!Aw!@!dbr!d','dv!d!Ay!@!d!u2!u/d!Aw!@!dbr!d!u2!u')
   call pltend()
+  endif
 
-  call autoplot(real(omegab(ip0:)), &
-       -dvdob(ip0:)*vpsiarray(ip0:)/real(omegab(ip0:)),ne-2*ip0)
-  call axlabels('!Aw!@!dbr!d','-dvdob*v/or')
-  call pltend()
-  
+  call autoplot(psi-vpsiarray**2/2,4.7*real(omegab)**2.25/psi**.127,ne)
+  call axis2
+  call axlabels('!Ay!@-v!d!Ay!@!d!u2!u/2', &
+       '!Aw!@!dbr!d!u2.25!u4.7/!Ay!@!u0.127!u')
+  call legendline(xleg,.9,258,string)
+  call pltend
 
 
 !  call autoplot(vpsiarray(ip0:)**2,real(omegab(ip0:))**2,ne-ip0)

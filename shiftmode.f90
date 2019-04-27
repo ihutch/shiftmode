@@ -5,7 +5,7 @@ module shiftmode
 !  integer, parameter :: nx=50, ne=100, nvy=50  !standard
 !  integer, parameter :: nx=20, ne=20, nvy=20   !low resolution
 !  integer, parameter :: nx=50, ne=400, nvy=30  ! fcontko highres
-  integer, parameter :: nx=300, ne=800, nvy=30  ! Low omegai
+  integer, parameter :: nx=100, ne=800, nvy=30  ! Low omegai
 !  integer, parameter :: nx=300, ne=400, nvy=30  ! Low omegai
   real, parameter :: pi=3.1415926, sq2pi=sqrt(2.*3.1415926)
   real :: psi=.1,pL=4.,k=.01, Ty=1.         ! psi, sech4width, k, Ty
@@ -20,6 +20,8 @@ module shiftmode
   real :: x(nx),phi(nx),phiprime(nx),tau(nx),v(nx)
   real :: xt(nx),phit(nx),phitprime(nx)      ! Values in trapped region
   complex :: Lt(nx),CapPhi(nx)               ! tilde L,CapPhi
+  complex :: PlotCapPhi(nx)
+  integer :: istart,iend
   ! Energy arrays
   integer :: iwpow=2
   real :: de,E(ne),vinfarray(ne),dvinf,fe0(ne),fe0de(ne) ! Passing orbits
@@ -102,14 +104,17 @@ contains
     xlent=xm
 
     ! 2.99 makes istart only just inside the orbit.
-    dxt=2.*xlent/(nx-2.99)  ! make array run from -xlen-r*dxt to xlen+r*dxt
+    dxt=2.*xlent/(nx-2.98)  ! make array run from -xlen-r*dxt to xlen+r*dxt
     xt=dxt*((/(i-1,i=1,nx)/)-(nx-1.)/2.)         ! x-position array
+    if(.true.)then !Rescale the x to put more points near the end
+       xt=sign(1.,xt)*xlent*(1.-(abs(abs(xt/xlent)-1.))**2)
+       xt(1)=2*xt(2)-xt(3)
+       xt(nx)=2*xt(nx-1)-xt(nx-2)
+    endif
     phit=psi/cosh(xt/pL)**4                        ! Potential
     phitprime=-psi*sinh(xt/pL)/cosh(xt/pL)**5*4/pL ! phi x-gradient
     istart=2  ! The first position that is inside the orbit.
 !    write(*,*)phitprime(1:2),phitprime(nx-1:nx)
-
-   
     iend=nx+1-istart
     if(istart.gt.nx/2)stop 'No steps on remeshed trapped orbit'    
     tau=0.
@@ -166,6 +171,7 @@ contains
     ! New version puts evaluations at ends of integration steps.
     complex :: Ftotal,dFdvpsi,dFdvprev,exptb,exptbprev,cdvpsi,dob
     real :: obi
+    character string*100
     if(idebug.eq.-2)then
        write(*,*)'FtEint',omegad,beta,dfperpdWperp
        write(*,*)'  vpsi   fe*s2pi            Ftrap       ' &
@@ -198,6 +204,30 @@ contains
           stop
        endif
        omegab(i)=2.*pi/tbe(i)
+       if(idebug.eq.-3  &
+!            .and.mod(i,ne/4).eq.1 &
+            .and.abs(-Wj/real(omega**2)-1.).lt..15 &
+            .and.omega.eq.omegad)then
+          !Diagnostic of CapPhi
+          PlotCapPhi=CapPhi  ! Save the Phi_0 for plotting.
+          if(i.eq.-10)then
+             call autoinit(tau(istart:iend), &
+                  real(PlotCapPhi(istart:iend)),iend-istart+1)
+             call axis
+          endif
+          call autoplot(tau(istart:iend), &
+               imag(PlotCapPhi(istart:iend)),iend-istart+1)
+          call polyline(tau(istart:iend), &
+               real(PlotCapPhi(istart:iend)),iend-istart+1)
+          call axlabels('tau','!AF!@')
+          call polyline(tau(istart:iend), &
+               imag(PlotCapPhi(istart:iend)),iend-istart+1)
+          write(string,'(a,f8.5,a,e10.2,a,f8.5)') &
+            'or=',real(omega),' oi=',imag(omega),' Wj=',Wj
+          call boxtitle(string(1:lentrim(string)))
+          call polymark(tau(istart:iend),v(istart:iend)/10.,iend-istart+1,1)
+          call pltend
+       endif
        call pathshift(i,obi)
        if(omegad.ne.omega.and.obi.ne.0)then
 !          write(*,'(a,i4,6f10.5)')'i,obi,omega,omegad',i,obi,omega,omegad
@@ -291,8 +321,6 @@ contains
        write(*,*)'FtEint',omegad,beta,dfperpdWperp
        write(*,*)'  vpsi   fe*s2pi            Ftrap       ' &
          ,'       tb     dvpsi    dFtotal'
-       call pltinit(-12.,12.,-8.,8.)
-       call axis()
     endif
 !    iwpow=2         ! Equal W spacing is ipow=1
     do i=1,ne
