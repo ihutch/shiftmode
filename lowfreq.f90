@@ -137,8 +137,8 @@ program lowfreq
   omegap=omega
   psifac=psi**(3.25)
   ci=10.
-  ct=1600.
-  cp=-6.5
+  ct=1000.
+  cp=-7
   call pfset(3)
   !     call lautoplot(or/tqpsi,imag(Ftcomplex(1:,1)),nor,.true.,.true.)
   call pltinit(0.,1.,0.,1)
@@ -148,7 +148,7 @@ program lowfreq
   xbot=or(1)/tqpsi
   xtop=or(nor)/tqpsi
   
-  write(string,'(''Imaginary Forces !Ay!@='',f7.4,'' !Aw!@!di!d='',e9.2)') &
+  write(string,'(''Imaginary Forces !Ay!@='',f4.2,'' !Aw!@!di!d='',e9.2)') &
        psi,oi(noi)
   write(*,*)'noi,oi=',ioi,oi
   call scalewn(xbot,xtop,ybot,ytop,.true.,.true.)
@@ -176,14 +176,14 @@ program lowfreq
   call dashset(2)
   call color(1)
   call polyline(or/tqpsi,ct*(or/tqpsi)**5,nor)
-  call legendline(.1,.83,0,' 1600!p!u^!u!q!Aw!@!p!dr!d!q!u5!u')
+  call legendline(.1,.83,0,' 1000!p!u^!u!q!Aw!@!p!dr!d!q!u5!u')
   call dashset(3)
   call legendline(.1,.76,0,' 10!p!u^!u!q!Aw!@!dr!d!p!u^!u!q!Aw!@!di!d')
   call polyline(or/tqpsi,ci*(or/tqpsi)*oi(noi)/uqpsi,nor)
   call color(2)
   call dashset(1)
   call polyline(or/tqpsi,-cp*(or/tqpsi)**3,nor)
-  call legendline(.1,.58,0,' 6.5!p!u^!u!q!Aw!@!p!dr!d!q!u3!u')
+  call legendline(.1,.58,0,'  7!p!u^!u!q!Aw!@!p!dr!d!q!u3!u')
   call pltend
 
   stop

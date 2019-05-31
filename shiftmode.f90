@@ -66,8 +66,6 @@ contains
     Wtscaled=(-Wt)**(1./iwpow)
     vpsiarray=sqrt(2.*(psi+Wt))
     beta=-1.-(15./16.)*sqrt(pi/psi) 
-!      beta=beta*(.8-.9/abs(beta))    ! Ad hoc correction density
-!      beta=beta*(1.-.75/abs(beta))    ! Ad hoc correction force.
     ! vy-arrays
     vymax=vymnorm*sqrt(Ty)
     dvy=vymax*2./(nvy-1.)                       ! vy-step
@@ -185,7 +183,8 @@ contains
     Ftotal=0.
     Wjprev=0.
     feprev=1/sqrt(2.*pi)
-    dfeprev=-beta*feprev*fperp
+!    dfeprev=-beta*feprev*fperp  ! Old Schamel approx
+    dfeprev=(15./(16.*sqrt(2.*psi))-1./sqrt(2.*pi))*fperp ! New exact analytic
     dfeperpprev=feprev*dfperpdWperp
     vpsiprev=sqrt(2.*psi)
     omegab(0)=0.
@@ -193,8 +192,14 @@ contains
     exptbprev=0.                  !Silence warnings
     do i=1,ne-1
        Wj=psi*(-(float(i)/ne)**iwpow)
-       fe=exp(-beta*Wj)/sqrt(2.*pi) ! Normalized f_\parallel
-       dfe=-beta*fe*fperp           ! df_||/dW_||
+       ! Old Schamel approximate form.
+!       fe=exp(-beta*Wj)/sqrt(2.*pi) ! Normalized f_\parallel
+!       dfe=-beta*fe*fperp           ! df_||/dW_||
+       ! New exact sech^4 hole form.
+       sqWj=sqrt(-Wj)
+       fe=((2./pi)*sqWj+(15./16.)*Wj/sqrt(psi)+experfcc(sqWj)/sqrt(pi))/sqrt(2.)
+       dfe=((15./16.)/sqrt(psi)-experfcc(sqWj)/sqrt(pi))/sqrt(2.)*fperp
+       ! End of choice
        dfeperp=fe*dfperpdWperp      ! df/dW_perp
        vpsi=sqrt(2.*(psi+Wj))
        dvpsi=vpsiprev-vpsi
@@ -327,47 +332,6 @@ contains
 !         i,sqrt(-Wt(i)),el,real(omegab(i))/(real(omegad)/el) &
 !         ,' obi',obi,real(omegad-omega)/omegac,dob,doel
   end subroutine pathshift
-!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!  
-  subroutine FtEintOld(Ftotal,dfperpdWperp,fperp)
-  ! Here we need to iterate over fe (trapped). Wj=vpsi^2/2-psi. So
-  ! vpsi=sqrt(2(psi+Wj)) We must use cells that fill the Wj range 0 to
-  ! -psi. Old version with evaluations in centers of cells.
-    complex :: Ftotal
-    Ftotal=0.
-    if(idebug.eq.-2)then
-       write(*,*)'FtEint',omegad,beta,dfperpdWperp
-       write(*,*)'  vpsi   fe*s2pi            Ftrap       ' &
-         ,'       tb     dvpsi    dFtotal'
-    endif
-!    iwpow=2         ! Equal W spacing is ipow=1
-    do i=1,ne
-       Wj=psi*(-((i-0.5)/ne)**iwpow)
-       fe=exp(-beta*Wj)/sqrt(2.*pi) ! Normalized f_\parallel
-       dfe=-beta*fe*fperp           ! df_||/dW_||
-!       dfe=-beta*fe           ! df_||/dW_|| old error
-       dfeperp=fe*dfperpdWperp      ! df/dW_perp
-       vpsi=sqrt(2.*(psi+Wj))
-       dvpsi=-sqrt(2.*psi*(1.-(float(i)/ne)**iwpow)) &
-            +sqrt(2.*psi*(1.-(float(i-1)/ne)**iwpow))
-       ! calculate the force Ftrap for this dvpsi and dvy element:
-       call dFdvpsidvy(vpsi,Ftrap(i),tbe(i),xlen(i))
-       if(.not.(abs(Ftrap(i)).ge.0))then
-          write(*,*)'Ftrap NAN?',Ftrap(i),Wj,vpsi!,dvpsi
-          write(*,'(a,8f8.4)')' omega,k,Omegac=',omega,k,Omegac
-          stop
-       endif
-       if(idebug.eq.-2)then
-          write(*,'(2f8.4,a,2es12.4,a,f8.3,f9.5,es12.4)')vpsi&
-               ,fe*sqrt(2.*pi) &
-               ,' (',Ftrap(i),')',tbe(i),dvpsi,real(Ftrap(i))*dvpsi
-       endif
-       ! Ftrap(i) becomes the contribution to F from this energy.
-       Ftrap(i)=Ftrap(i)*(omegad*dfe-(omegad-omega)*dfeperp)*dvpsi
-       Ftrap(i)=Ftrap(i)/(1-exp(sqm1*omegad*tbe(i))) ! From sumfactor
-       ! Multiply by 2. to account for \pm v_\psi.
-       Ftotal=Ftotal+2.*Ftrap(i)       ! Add to Ftotal integral.
-    enddo
-  end subroutine FtEintOld
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   subroutine FtVyint()
     ! Integrate (histogram) over vy to get Ftraptotal.
@@ -547,6 +511,17 @@ contains
        endif
     enddo
   end subroutine orbitend
+!****************************************************************
+! This is exp(X^2)*erfc(X)
+      FUNCTION expERFCC(X)
+      Z=ABS(X)      
+      T=1./(1.+0.5*Z)
+      expERFCC=T*EXP(-1.26551223+T*(1.00002368+T*(.37409196+             &
+     &    T*(.09678418+T*(-.18628806+T*(.27886807+T*(-1.13520398+        &
+     &    T*(1.48851587+T*(-.82215223+T*.17087277)))))))))
+      IF (X.LT.0.) expERFCC=2.*exp(z**2)-expERFCC
+      END
+!********************************************************************
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 end module shiftmode
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
