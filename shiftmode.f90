@@ -33,7 +33,8 @@ module shiftmode
   complex :: Ftrap(ne)
   complex :: omegab(0:ne),Fnonres(0:ne)
   ! vy arrays
-  real :: vy(nvy),fy(nvy),fywy(nvy),dtaumax
+  real :: vy(nvy),fy(nvy),fywy(nvy)
+!  real :: dtaumax  ! seems unused
   real :: dvy
   complex :: Ftrapvy(nvy),Fpassvy(nvy)
   ! Magnetic field information
@@ -48,7 +49,7 @@ contains
     x=dx*(/(i-1,i=1,nx)/)-xL                    ! x-position array
     phi=psi/cosh(x/pL)**4                       ! Potential
     phiprime=-psi*sinh(x/pL)/cosh(x/pL)**5*4/pL ! phi x-gradient
-    ! vinf arrays
+    ! vinf passing arrays
     vinfmax=sqrt(2.*Emax)      ! The uppermost orbit
     dvinf=vinfmax/ne           ! Use steps of constant vinf spacing.
     vinfarray=dvinf*(/(i-0.5,i=1,ne)/)  ! vinf array 
@@ -60,22 +61,20 @@ contains
     fe0de=-fe0*(1-vdrift/vinfarray)     ! Derivative wrt E.
     fe0neg=exp(-Eminus)/sq2pi ! Normalized Maxwellian with unit temperature.
     fe0deneg=-fe0neg*(1-vdrift/vinfneg) ! Derivative wrt E.
-!    write(*,'(3f8.4)')(E(i),fe0de(i),fe0deneg(i),i=1,ne)
-    ! vpsi arrays changed to be consistent with linear interpolation
-!    Wt=-psi*(/((i-0.5)/ne,i=1,ne)/)**iwpow
+    ! vpsi trapped arrays
     Wt=-psi*(/(float(i)/ne,i=1,ne)/)**iwpow
     Wtscaled=(-Wt)**(1./iwpow)
     vpsiarray=sqrt(2.*(psi+Wt))
+    beta=-1.-(15./16.)*sqrt(pi/psi) 
+!      beta=beta*(.8-.9/abs(beta))    ! Ad hoc correction density
+!      beta=beta*(1.-.75/abs(beta))    ! Ad hoc correction force.
     ! vy-arrays
     vymax=vymnorm*sqrt(Ty)
     dvy=vymax*2./(nvy-1.)                       ! vy-step
     vy=dvy*(/(i-1,i=1,nvy)/)-vymax              ! vy array.
     fy=exp(-vy**2/(2.*Ty))/sqrt(2.*pi*Ty)       ! fy Normalized Maxwellian
     fywy=-fy/Ty                                 ! gradient
-    dtaumax=0.
-    beta=-1.-(15./16.)*sqrt(pi/psi) 
-!      beta=beta*(.8-.9/abs(beta))    ! Ad hoc correction density
-!      beta=beta*(1.-.75/abs(beta))    ! Ad hoc correction force.
+!    dtaumax=0.
   end subroutine initialize
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!  
 !Trapped particle routines. Can only be called after initialization.
@@ -104,7 +103,7 @@ contains
     xlent=xm
 
     ! 2.99 makes istart only just inside the orbit.
-    dxt=2.*xlent/(nx-2.98)  ! make array run from -xlen-r*dxt to xlen+r*dxt
+    dxt=2.*xlent/(nx-2.99)  ! make array run from -xlen-r*dxt to xlen+r*dxt
     xt=dxt*((/(i-1,i=1,nx)/)-(nx-1.)/2.)         ! x-position array
     if(.true.)then !Rescale the x to put more points near the end
        xt=sign(1.,xt)*xlent*(1.-(abs(abs(xt/xlent)-1.))**2)
@@ -157,9 +156,12 @@ contains
 ! \int sqm1*phitprime*(omega*dfe ...)*CapPhi  dtau vpsi
     do i=istart,iend
        exptau=exp(sqm1*omegad*tau(i))
+! This is the integral 0-tb: giving CapPhi:
        CapPhi(i)=omegad*((1.-exptb)*Lt(i)+exptau*(exptbb2-1.)*Ltbb2)
 ! The dtau to be applied to this subsequent tau integral. 
        dtau=tau(i)-tau(i-1)
+! This gives the integral 0-tb/2 of CapPhi without resonant muliplier
+! or the f' terms so it needs to be multiplied by (2)(res-mult)(f'terms):
        trapforce=trapforce+sqm1*  &
        (CapPhi(i)*phitprime(i)+CapPhi(i-1)*phitprime(i-1))/2.*dtau*vpsi
     enddo
@@ -206,7 +208,8 @@ contains
        omegab(i)=2.*pi/tbe(i)
        if(idebug.eq.-3  &
 !            .and.mod(i,ne/4).eq.1 &
-            .and.abs(-Wj/real(omega**2)-1.).lt..15 &
+!            .and.abs(-Wj/real(omega**2)-1.).lt..15 &
+            .and.abs(real(omegab(i))/real(omega)-1.).lt..05 &
             .and.omega.eq.omegad)then
           !Diagnostic of CapPhi
           PlotCapPhi=CapPhi  ! Save the Phi_0 for plotting.
@@ -216,16 +219,25 @@ contains
              call axis
           endif
           call autoplot(tau(istart:iend), &
-               imag(PlotCapPhi(istart:iend)),iend-istart+1)
-          call polyline(tau(istart:iend), &
                real(PlotCapPhi(istart:iend)),iend-istart+1)
-          call axlabels('tau','!AF!@')
+          call legendline(.1,.1,0,' real(!AF!@)')
+          call dashset(1)
           call polyline(tau(istart:iend), &
                imag(PlotCapPhi(istart:iend)),iend-istart+1)
+          call legendline(.1,.15,0,' imag(!AF!@)')
+          call axlabels('tau','!AF!@')
+          call axis2
+          call dashset(2)
+!          call polyline(tau(istart:iend), &
+!               imag(PlotCapPhi(istart:iend)),iend-istart+1)
+          call dashset(0)
           write(string,'(a,f8.5,a,e10.2,a,f8.5)') &
-            'or=',real(omega),' oi=',imag(omega),' Wj=',Wj
+            'or=',real(omega),' oi=',imag(omega),' ob=',real(omegab(i))
           call boxtitle(string(1:lentrim(string)))
-          call polymark(tau(istart:iend),v(istart:iend)/10.,iend-istart+1,1)
+          call polymark(tau(istart:iend),v(istart:iend)/5.,iend-istart+1,1)
+          call polymark(tau(istart:iend),xt(istart:iend)/200.,iend-istart+1,2)
+          call legendline(.7,.95,1,' v/5')
+          call legendline(.7,.9,1,' z/200')
           call pltend
        endif
        call pathshift(i,obi)
@@ -242,13 +254,16 @@ contains
        endif
        dob=omegab(i)-omegab(i-1)
        cdvpsi=dvpsi*(1.+sqm1*imag(dob)/real(dob))
+       ! Strictly to get dFdvpsi we need to multiply by the omega f' terms
        Fnonres(i)=dFdvpsi*(omegad*dfe-(omegad-omega)*dfeperp)
+       ! and correct for the imaginary shift of omegab:
        Fnonres(i)=Fnonres(i)+sqm1*real(Fnonres(i)-Fnonres(i-1))  &
             /real(omegab(i)-omegab(i-1))*obi
        if(tbe(i)*imag(omegad).lt.-4.)then ! Hack to fix giant dFdvpsi problem.
           write(*,*)'drop',tbe(i),imag(omegad),dFdvpsi
           Fnonres(i)=0.
        endif
+       ! Then multiply by the resonance factor and the complex dvpsi and sum.
        Ftrap(i)=0.5*(Fnonres(i)/(1.-exptb) &
             +Fnonres(i-1)/(1.-exptbprev))*cdvpsi
        if(.not.(abs(Ftrap(i)).ge.0))then
@@ -272,6 +287,8 @@ contains
     Ftrap(ne)=Ftrap(ne-1)+0.5*(Ftrap(ne-1)-Ftrap(ne-2))
     Ftotal=Ftotal+2.*Ftrap(i)
     Fnonres(ne)=Fnonres(ne-1) !+0.5*(Fnonres(ne-1)-Fnonres(ne-2))
+    ! Now Ftrap(i) is a quantity when simply summed over all ne positions
+    ! and multiplied by 2 gives the total force. 
     if(.false.)then
     ! Diagnostic plots
     call autoplot(real(omegab(1:ne)),real(Fnonres(1:ne)),ne)
@@ -487,7 +504,6 @@ contains
        omegad=omega+m*Omegac
        call FpEint(Fpassvy(m+1),-1./Ty,1.)
        call FtEint(Ftrapvy(m+1),-1./Ty,1.)
-!       if(.false.)then
        if(real(omega).eq.0)then   !Short cut.
           Fpasstotal=Fpasstotal+2*real(Fpassvy(m+1))*EIm(m)
           Ftraptotal=Ftraptotal+2*real(Ftrapvy(m+1))*EIm(m)

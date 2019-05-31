@@ -6,35 +6,41 @@ program dFtdWs
 
   integer, parameter :: nomegad=1
 
-  complex :: Ft(ne,nomegad),Fomega(nomegad)
-  integer :: j,iwidth,ip0,lentrim
+  complex :: Ft(ne,nomegad),Fomega(nomegad),Fbroad
+  integer :: j,iwidth,ip0,lentrim,ip1,i
   real :: omegarmax,omegar(nomegad),omegai
   real :: pmin,pmax,pdum,xleg,yleg
-  real :: dvdob(ne)
+  real :: bestfit(ne)
   character*30 string
   character*20 wvar
   logical :: limag=.true.
-  real :: pwr
+  real :: pwr,cw,zB,fd,fn
+  real :: plotx(ne),ploty(ne)
   
   psi=.16
   omegarmax=(nomegad/max(nomegad-1.,1.))*sqrt(psi)/2.    *.1
   omegai=.0002
   call initialize
 
-  write(*,*)'case, omegar,   omegai,     Ftr       Fti'
+  write(*,*)'case, omegar,   omegai,     Ftr       Fti    Fbroadr  Fbroadi  '
   do j=1,nomegad
      omegar(j)=j*omegarmax/nomegad
      omegad=omegar(j)+sqm1*omegai
      omega=omegad   ! This is needed for 1-D (high Omega) case.
      ! It determines the balance of perp and parallel gradients.
      call FtEint(Fomega(j),-1./Ty,1.)
-!     call FtEintOld(Fomega(j),-1./Ty,1.)
-     write(*,'(i3,6f10.6)')j,omegar(j),omegai,Fomega(j)
-     Ft(:,j)=Ftrap
+     ! Calculate the contribution from the broad part above resonance.
+     Fbroad=0.
+     ip1=int(2.*omegar(j)*ne/Wtscaled(ne))
+     do i=ip1,ne
+        Fbroad=Fbroad+Ftrap(i)
+     enddo
+     write(*,'(i3,9f10.6)')j,omegar(j),omegai,Fomega(j),Fbroad
+ !,real(Fbroad)/imag(Fbroad)
+     Ft(:,j)=Ftrap*2.*ne/Wtscaled(ne) ! Convert to true dFt/d(-W).
+     ! So now we need to multiply Ft by dWtscaled and sum to integrate.
   enddo
 
-!  write(*,*)real(PhiInt(:,1))
-!  write(*,'(10f8.4)')sWj-Wtscaled
   ip0=2
   call pfset(3)
 
@@ -70,6 +76,10 @@ program dFtdWs
      if(limag)then
         call dashset(2)
         call polyline(Wtscaled(ip0),imag(Ft(ip0:ne,j)),ne-ip0+1)
+  ! Scale the imaginary part to show it comes from real part*2oi/or.
+        call dashset(4)
+        call polyline(Wtscaled(ip1),imag(Ft(ip1:ne,j))*.5*omegar(j)/omegai &
+        ,ne-ip0+1)
         call dashset(0)
      endif
   enddo
@@ -86,9 +96,9 @@ program dFtdWs
   call winset(.true.)
   call dashset(1)
   ! Formula
-  pwr=0.45
-  call polyline(Wtscaled/sqrt(psi), &
-       sqrt(1/2.)/((sqrt(psi)/Wtscaled)**pwr+(sqrt(2.))**pwr-1.)**(1/pwr),ne)
+  pwr=.5
+  ploty=sqrt(1/2.)/((sqrt(psi)/Wtscaled)**(pwr)+(sqrt(2.))**pwr-1.)**(1/pwr)
+  call polyline(Wtscaled/sqrt(psi),ploty,ne)
   call dashset(4)
   call polyline(Wtscaled/sqrt(psi), &
        Wtscaled/sqrt(2.*psi),ne)
@@ -101,26 +111,42 @@ program dFtdWs
   call dashset(0)
   call pltend
 
-  if(.false.)then
-  call autoplot(vpsiarray(ip0),real(omegab(ip0:)),ne-ip0)
-  call axlabels('v!d!Ay!@!d','!Aw!@!dbr!d')
-  call pltend()
-  
-  do j=ip0,ne-ip0
-     dvdob(j)=(vpsiarray(j+1)**2-vpsiarray(j-1)**2)/(real(omegab(j+1))**2-real(omegab(j-1))**2)
-  enddo
-  call autoplot(real(omegab(ip0:)),dvdob(ip0:),ne/2)
-  call axlabels('!Aw!@!dbr!d','dv!d!Ay!@!d!u2!u/d!Aw!@!dbr!d!u2!u')
-  call pltend()
-  endif
+  zB=1.5
+  cw=(4*zB/3.14159)
+  fn=cw/(sqrt(2.)-1.)-1.
+  fd=cw*sqrt(2.)/(sqrt(2.)-1.)-1.
+  bestfit=(1.+fn*Wtscaled/sqrt(2.*psi))/ &
+       (1.+fd*Wtscaled/sqrt(2.*psi))
+  call autoplot(Wtscaled/sqrt(psi),real(omegab(1:))/sqrt(psi)&
+       /(Wtscaled/sqrt(2.*psi)),ne-1)
+  call axlabels('(-W/!Ay!@)!u0.5!u','omegab/sqrt(-2W), Power Fit, Ratio')
+  call dashset(2)
+  call polyline(Wtscaled/sqrt(psi),real(omegab(1:))/sqrt(psi)/ploty,ne-1)
+!  call polyline(Wtscaled/sqrt(psi),ploty/(Wtscaled/sqrt(2.*psi)),ne-1)
+  call dashset(3)
+  call polyline(Wtscaled/sqrt(psi),bestfit,ne-1)
+  call dashset(0)
+  call pltend
 
-  call autoplot(psi-vpsiarray**2/2,4.7*real(omegab)**2.25/psi**.127,ne)
+  if(.false.)then
+  call autoplot(psi-vpsiarray**2/2,4.7*real(omegab(1:ne))**2.25/psi**.127,ne-1)
   call axis2
   call axlabels('!Ay!@-v!d!Ay!@!d!u2!u/2', &
        '!Aw!@!dbr!d!u2.25!u4.7/!Ay!@!u0.127!u')
   call legendline(xleg,.9,258,string)
   call pltend
+  endif
 
+  plotx=Wtscaled/psi
+  ploty=4.7*real(omegab(1:ne))**2.25/psi**.127/Wtscaled**2
+  call autoplot(plotx,ploty,ne-1)
+  call axis2
+  call axlabels('(-W/!Ay!@)!u0.5!u', &
+       '!Aw!@!dbr!d!u2.25!u4.7/!Ay!@!u0.127!u/(-W/!Ay!@)')
+    call legendline(xleg,.9,258,string)
+  call pltend
+
+  
 
 !  call autoplot(vpsiarray(ip0:)**2,real(omegab(ip0:))**2,ne-ip0)
 !  call lautoplot(vpsiarray(ip0:)**2,real(omegab(ip0:))**2,ne-ip0,.true.,.true.)

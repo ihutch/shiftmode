@@ -13,18 +13,17 @@ program lowfreq
   character*30 filename,argument
   real :: kp
 !  logical :: lcont=.false.,lplot=.false.
-  logical :: lcont=.true.,lplot=.true.
+  logical :: lcont=.true.,lplot=.false.
   real :: ormax,oimax
   complex :: omegap
   character*80 string
 
-  idebug=-3
-  Omegacmax=20.
+!  idebug=-3   ! Whether we are debugging in shiftmode.
+  Omegacmax=5.
 
   k=0.
-  psip=.64
-!  psip=.04
-!  psip=.16
+!  psip=.64
+  psip=.16
 !  psip=.09
 !  psip=.25
 !  psip=.04
@@ -99,7 +98,7 @@ program lowfreq
 !           if(noi.eq.1.and.ior.eq.1)or(ior)=0.5*ormax/(nor-1.) 
            ! Uniform log plot alternative.
            or(ior)=ormax*10.**(-2.5*(1.-(ior-1.)/(nor-1.))) *1.3
-           dioi=0.00   ! Offset of oi(1) from zero.
+           dioi=.2   ! Offset of oi(1) from zero.
            do ioi=1,noi
               oi(ioi)=(ioi-1+dioi)*oimax/(noi-1+dioi)
               if(noi.eq.1)oi(ioi)=1.*dioi*oimax
@@ -136,38 +135,59 @@ program lowfreq
 
   err=1.
   omegap=omega
+  psifac=psi**(3.25)
+  ci=10.
+  ct=1600.
+  cp=-6.5
   call pfset(3)
   !     call lautoplot(or/tqpsi,imag(Ftcomplex(1:,1)),nor,.true.,.true.)
   call pltinit(0.,1.,0.,1)
-  ytop=imag(Ftcomplex(nor,1))
-  ybot=imag(-Fpcomplex(1,1))
+  call charsize(.018,.018)
+  ytop=imag(Ftcomplex(nor,1))/psifac
+  ybot=imag(-Fpcomplex(1,1))/psifac
   xbot=or(1)/tqpsi
   xtop=or(nor)/tqpsi
   
   write(string,'(''Imaginary Forces !Ay!@='',f7.4,'' !Aw!@!di!d='',e9.2)') &
        psi,oi(noi)
   write(*,*)'noi,oi=',ioi,oi
-  call fitscale(xbot,xtop,ybot,ytop,.true.,.true.)
-  call polyline(or/tqpsi,imag(Ftcomplex(1:,1)),nor)
+  call scalewn(xbot,xtop,ybot,ytop,.true.,.true.)
   call boxtitle(string(1:lentrim(string)))
   call axis
   call axis2
-  call axlabels('!Aw!B!dr!d/!Ay!@!u3/4!u','F')
+  call axlabels('!p!u^!u!q!Aw!B!dr!d!A=w!B!dr!d!@/!Ay!@!u3/4!u', &
+       '!p!o^!o!qF!A=!@F/!Acy!@!u13/4!u')
   call winset(.true.)
-  call legendline(.1,.9,0,'   F!dt!d')
-  call dashset(4)
-  call polyline(or/tqpsi,imag(Ftcomplex(nor,1))*(or/or(nor))**4.5,nor)
-  call legendline(.1,.8,0,' !Aw!@!dr!d, !Aw!@!dr!d!u3!u, !Aw!@!dr!d!u4.5!u') 
-  call polyline(or/tqpsi,imag(Ftcomplex(1,1))*(or/or(1))**1,nor)
   call color(1)
-  call dashset(2)
-  call legendline(.1,.85,0,'  -F!dp!d')
-  call polyline(or/tqpsi,imag(-Fpcomplex(1:,1)),nor)
-  call dashset(4)
-  call polyline(or/tqpsi,imag(-Fpcomplex(nor,1))*(or/or(nor))**3,nor)
+  call polyline(or/tqpsi,imag(Ftcomplex(1:,1))/psifac,nor)
+  call legendline(.1,.9,0,'   !p!o^!o!qF!dt!d')
+  call color(2)
+!  call dashset(2)
+  call legendline(.1,.65,0,'  -!p!o^!o!qF!dp!d')
+  call polyline(or/tqpsi,imag(-Fpcomplex(1:,1))/psifac,nor)
+!  call dashset(4)
+!  call polyline(or/tqpsi,imag(-Fpcomplex(nor,1))*(or/or(nor))**3,nor)
   call dashset(0)
+  call color(3)
+
+! Additional diagnostic lines
+!  call polyline(or/tqpsi,imag(complex(0,1)*Ftcomplex(1:,1)*2.*oi(noi)/or),nor)
+!  call legendline(.1,.75,0,'  i(2!Aw!@!di!d/!Aw!@!dr!d)F!dt!d')
+  call dashset(2)
+  call color(1)
+  call polyline(or/tqpsi,ct*(or/tqpsi)**5,nor)
+  call legendline(.1,.83,0,' 1600!p!u^!u!q!Aw!@!p!dr!d!q!u5!u')
+  call dashset(3)
+  call legendline(.1,.76,0,' 10!p!u^!u!q!Aw!@!dr!d!p!u^!u!q!Aw!@!di!d')
+  call polyline(or/tqpsi,ci*(or/tqpsi)*oi(noi)/uqpsi,nor)
+  call color(2)
+  call dashset(1)
+  call polyline(or/tqpsi,-cp*(or/tqpsi)**3,nor)
+  call legendline(.1,.58,0,' 6.5!p!u^!u!q!Aw!@!p!dr!d!q!u3!u')
   call pltend
 
+  stop
+  
 ! Calculate and plot the force scaling with psi.
   write(*,*)'ipsi   psi      omega       Ftcpsi/psi^3.2   Fpcpsi/psi^3.2'
   do ipsi=1,npsi
@@ -189,7 +209,7 @@ program lowfreq
      Fpcpsi(ipsi)=Fpasstotal
      write(*,'(i3,7f8.4)')ipsi,psi,omega,Ftcpsi(ipsi)/psi**3.2,Fpcpsi(ipsi)/psi**3.2
   enddo
-
+  
   call lautoplot(psiF,imag(Ftcpsi),npsi,.true.,.true.)
   call boxtitle('Imaginary Force at constant !Aw!@/!Ay!@!u0.75!u=0.07')
   call axis2
