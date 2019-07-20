@@ -14,7 +14,7 @@ module shiftmode
   real :: beta                              ! inverse hole parallel temp.
   complex :: omega=(0.0,.01)                ! complex frequency
   integer :: idebug=0
-  complex :: omegad,sqm1=(0.,1.),Ftraptotal,Fpasstotal,Fsum
+  complex :: omegad,sqm1=(0.,1.),Ftraptotal,Fpasstotal
   ! Position arrays
   real :: dx
   real :: x(nx),phi(nx),phiprime(nx),tau(nx),v(nx)

@@ -58,9 +58,14 @@ program dFtdWs
   wvar='(-W!d||!d)!u1/'//string(1:1)//'!u'
   call axlabels(wvar,'!BdF!dt!d/d!@'//wvar)
   call polyline((/Wtscaled(ip0),Wtscaled(ne)/),(/0.,0./),2)
-  call legendline(xleg,yleg,258,'  !Aw!B!dr!d!@')
+  if(nomegad.gt.1)then
+     call legendline(xleg,yleg,258,'  !Aw!B!dr!d!@')
+  else
+     call fwrite(omegar(1),iwidth,4,string)
+     call legendline(xleg,yleg,258,'!Aw!B!dr!d!@='//string)
+  endif
   string='!Aw!B!di!d!@='
-  call fwrite(omegai,iwidth,6,string(lentrim(string)+1:))
+  call fwrite(omegai,iwidth,4,string(lentrim(string)+1:))
   call legendline(xleg,.85,258,string)
   string='!Ay!@='
   call fwrite(psi,iwidth,2,string(lentrim(string)+1:))
@@ -68,18 +73,27 @@ program dFtdWs
   call charsize(.015,.015)
   do j=1,nomegad
      call color(j)
-     call iwrite(j,iwidth,string)
-     call labeline(Wtscaled(ip0),real(Ft(ip0:ne,j)),ne-ip0+1,string,iwidth)
-     string(2:2)=' '
-     call fwrite(omegar(j),iwidth,3,string(3:))
-     call legendline(xleg,yleg-.05*j,258,string)
-     if(limag)then
+     if(nomegad.gt.1)then
+        call iwrite(j,iwidth,string)
+        call labeline(Wtscaled(ip0),real(Ft(ip0:ne,j)),ne-ip0+1,string,iwidth)
+        string(2:2)=' '
+        call fwrite(omegar(j),iwidth,3,string(3:))
+        call legendline(xleg,yleg-.05*j,258,string)
+     else
+        call polyline(Wtscaled(ip0),real(Ft(ip0:ne,j)),ne-ip0+1)
+        call legendline(xleg,yleg-.05,0,' real')
+     endif
+     if(limag.and.j.eq.1)then
         call dashset(2)
+        call color(4)
         call polyline(Wtscaled(ip0),imag(Ft(ip0:ne,j)),ne-ip0+1)
   ! Scale the imaginary part to show it comes from real part*2oi/or.
+        call legendline(xleg,yleg-.1,0,' imaginary')
+        call color(5)
         call dashset(4)
         call polyline(Wtscaled(ip1),imag(Ft(ip1:ne,j))*.5*omegar(j)/omegai &
-        ,ne-ip0+1)
+             ,ne-ip1)
+        call legendline(xleg,yleg-.15,0,' imaginary!AXw!B!dr!d!@/2!Aw!B!di!d!@')
         call dashset(0)
      endif
   enddo
