@@ -29,6 +29,10 @@ MODULES=shiftmode.o acpath.o
 % : %.f $(ACCISX) $(LIBDEPS);
 	$(FORTRAN)  -o $* $(COMPILE-SWITCHES) $*.f $(LIBPATH) $(LIBRARIES)
 
+# The following triggers removal of (MODULES).o if they are compiled
+# in response to the dependency. I don't know why. If they pre-exist
+# then the removal does not happen. If there's no way to make the modules
+# then the make will fail mysteriously.
 % : %.f90  makefile $(ACCISX) $(MODULES) $(LIBDEPS);
 	$(FORTRAN)  -o $* $(COMPILE-SWITCHES) $*.f90 $(MODULES) $(LIBPATH) $(LIBRARIES)
 
