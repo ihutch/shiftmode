@@ -5,11 +5,6 @@
 # Decide the FORTRAN compiler and create the accis graphics routines:
 include ACCIS.mk
 #########################################################################
-# This dependency should be included in the application makefile.
-$(ACCISX) : $(ACCISHOME)Makefile
-	@echo "$(ACCISCHECK)"
-	cd $(ACCISHOME); make; cd -
-#########################################################################
 LIBRARIES := $(LIBRARIES) -lmodbess
 LIBDEPS := $(LIBDEPS) libmodbess.a
 COMPILE-SWITCHES:=$(COMPILE-SWITCHES) -Wno-unused-dummy-argument
@@ -45,6 +40,6 @@ libmodbess.a : bessmodIs.f
 	ar -crs libmodbess.a bessmodIs.o
 
 clean :
-	rm -f *.o *.mod omarray tbedoc verifymain kpsiarray? fcontko dFtdWs bessmodsums omsolve fhgfuncmain libmodbess.a
+	rm -f *.o *.mod omarray tbedoc verifymain kpsiarray? fcontko dFtdWs bessmodsums omsolve fhgfuncmain libmodbess.a omegacont lowfreq plot000*.ps
 
 
