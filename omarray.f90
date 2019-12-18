@@ -14,8 +14,8 @@ program main
 !  real :: omega0,omega1,oval
   logical :: lcompare=.true.
   external forcebalance
-  psi=.1
-  Omegac=.09
+  psi=.25
+  Omegac=.2
 
   call initialize
 ! k-scan

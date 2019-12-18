@@ -39,6 +39,9 @@ libmodbess.a : bessmodIs.f
 	$(FORTRAN) -c bessmodIs.f
 	ar -crs libmodbess.a bessmodIs.o
 
+# An attempt to prevent repetitive module compilation.
+modules : $(MODULES)
+
 clean :
 	rm -f *.o *.mod omarray tbedoc verifymain kpsiarray? fcontko dFtdWs bessmodsums omsolve fhgfuncmain libmodbess.a omegacont lowfreq plot000*.ps
 
