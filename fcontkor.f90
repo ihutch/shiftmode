@@ -20,15 +20,16 @@ program fcontkor
   integer lentrim
   external lentrim
   
-  psi=.64
+  psi=.36
   Ty=1.
   akmin=0.002                     ! Lowest k/sqrt(psi) plotted.
   akmax=0.7/sqrt(Ty)              ! range of k/sqrt(psi)
-  omegarmax=.55*akmax**0.75       ! Estimated range of omega/sqrt(psi)
+!  omegarmax=.55*akmax**0.75       ! Estimated range of omega/sqrt(psi)
+  omegarmax=0.4209
   omegarmin=0.0
-  omegacmax=0.80                  ! Maximum Omegac/sqrt(psi)=Omegacp
-  omegacmin=.10                   ! Minimum ditto
-  nioc=8                          ! Number of Omegac cases.
+  omegacmax=2.00                  ! Maximum Omegac/sqrt(psi)=Omegacp
+  omegacmin=1.0                   ! Minimum ditto
+  nioc= 3                         ! Number of Omegac cases.
   oi=.001
 ! To select a different set of cases adjust these parameters:
   noc1=1                  
@@ -49,17 +50,20 @@ program fcontkor
   enddo
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!  
   call pfset(3)
-  call pltinit(0.,akmax,0.,omegarmax*sqrt(psi))
+  call pltinit(0.,akmax,0.,omegarmax)
+  call charsize(.018,.018)
   call axis
   call axis2
+! Correct the axis scaling so we can plot in terms of omega not omega/spsi:
+  call scalewn(0.,akmax,0.,omegarmax*sqrt(psi),.false.,.false.)
   call axlabels('!Bk!@/!A)y!@','!Aw!B!dr!d!@/!A)y!@')
   string='!Ay!@='
   call fwrite(psi,iwidth,2, string(lentrim(string)+1:))
   call legendline(.8,1.03,258,string)
   string='!Aw!B!di!d!@='
   call fwrite(oi,iwidth,3, string(lentrim(string)+1:))
-  call legendline(.6,1.03,258,string)
-  call legendline(0.,1.03,258,'Labels !AW!@/!A)y!@')
+  call legendline(.55,1.03,258,string)
+  if(noc1.ne.nocmax)call legendline(0.,1.03,258,'Labels !AW!@/!A)y!@')
   !  string='!BT!dy!d!@='
 !  call fwrite(Ty,iwidth,2, string(lentrim(string)+1:))
 !  call legendline(.8,.83,258,string)
@@ -135,6 +139,10 @@ program fcontkor
      zclv(1)=Omegacp
      icsw=1
      ! Fool contour into plotting the zero level but labeling it with Omegac.
+     
+     string='!AW!@/!A)y!@='
+     call fwrite(Omegacp,iwidth,2, string(lentrim(string)+1:))
+     if(noc1.eq.nocmax)call legendline(0.,1.03,258,'Force     '//string)
      call color(2)
      if(noc1.eq.nocmax)icl=-1
      call contourl(real(Forcecomplex)+Omegacp, &
