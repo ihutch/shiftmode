@@ -1,12 +1,13 @@
-!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 module shiftmode
   ! We use x in place of z, because x is real.
 !  integer, parameter :: nx=50, ne=100, nvy=50  !standard
 !  integer, parameter :: nx=20, ne=20, nvy=20   !low resolution
 !  integer, parameter :: nx=50, ne=400, nvy=30  ! fcontko highres
-  integer, parameter :: nx=100, ne=800, nvy=30  ! Low omegai
+!  integer, parameter :: nx=100, ne=800, nvy=30  ! Low omegai
 !  integer, parameter :: nx=300, ne=400, nvy=30  ! Low omegai
+  integer, parameter :: nx=200, ne=200, nvy=30  ! High space resolution
   real, parameter :: pi=3.1415926, sq2pi=sqrt(2.*3.1415926)
   real :: psi=.1,pL=4.,k=.01, Ty=1.         ! psi, sech4width, k, Ty
   real :: xL=20.,Emax=4.,vymnorm=4.,vymax   ! Hole length, Energy, v_y
@@ -29,6 +30,9 @@ module shiftmode
   real :: Eplus(ne),Eminus(ne)
   real :: Wt(ne),Wtscaled(ne),vpsiarray(ne)  ! Trapped orbit energies etc.
   real :: xlen(ne),tbe(ne)                   ! Trapped orbit length, period.
+  integer, parameter :: nfou=10
+  real :: fout(0:ne,0:nfou)                  ! Fourier modes of trap orbit.
+  integer :: ilfou=0                         ! Whether modes are calculated
   complex :: fte(nx,0:ne)
   complex :: Ftrap(ne)
   complex :: omegab(0:ne),Fnonres(0:ne)
@@ -211,6 +215,32 @@ contains
           stop
        endif
        omegab(i)=2.*pi/tbe(i)
+
+       if(ilfou.ne.0)then
+          ! Fourier analysis for orbit found in dFdvpsidvy tau(j)
+          do il=0,nfou
+             fouold=0.
+             fouint=0.
+             do j=istart-1,iend+1
+                founew=phit(j)*cos(il*2.*3.1415926*(tau(j)*2./tbe(i)-.5))
+                fouint=fouint+(tau(j)-tau(j-1))*(founew+fouold)/2.
+                fouold=founew
+             enddo
+             fout(i,il)=fouint*4./tbe(i)
+          enddo
+          if(idebug.eq.-4)then
+             call pltinit(-.5,.5,0.,1.)
+             call axis
+             call polyline(2.*tau(istart:iend+1)/tbe(i)-.5, &
+                  phit(istart:iend+1)/psi,iend+1-istart)
+             call polyline(2.*tau(istart:iend+1)/tbe(i)-.5, &
+                  .5*(cos(1*2.*3.1415926*(tau(istart:iend+1)*2./tbe(i)-.5))+1),&
+                  iend+1-istart)
+!             call fwrite
+             call pltend
+          endif
+       endif
+       
        if(idebug.eq.-3  &
 !            .and.mod(i,ne/4).eq.1 &
 !            .and.abs(-Wj/real(omega**2)-1.).lt..15 &
