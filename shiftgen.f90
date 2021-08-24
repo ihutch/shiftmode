@@ -26,9 +26,9 @@
 ! Repelling hill psi>0, attracted valley psi<0.
 
 module shiftgen
-  integer, parameter :: ngz=50,nge=100
+  integer, parameter :: ngz=100,nge=100
   real, dimension(-ngz:ngz) :: zg,vg,ones=1.,phig,phigprime,taug
-  complex, dimension(-ngz:ngz) :: Lg
+  complex, dimension(-ngz:ngz) :: Lg,CapPhig
   complex :: omegag=(1.,0.),sqm1=(0.,1.),Ftot
   real :: psig=.1,Wg,zm=10.,v0
   integer :: ivs
@@ -129,8 +129,9 @@ contains
   ! Integrate Lg dt (=dz/v) to get the differential
   ! force density with respect to vy and vinf when multiplied by
   ! df/dW_parallel.
-    complex :: dForceg,Lgfactor,Lgb2
-    
+    complex :: dForceg,Lgfactor
+    complex :: exptb,exptbb2,exptau
+
     if(Wg.ge.0.)then
        v0=sqrt(2.*Wg)
     else
@@ -154,21 +155,29 @@ contains
        taug(i)=taug(i-1)+dtau
        Lgfactor=exp(sqm1*omegag*dtau) ! Current exponential
        Lg(i)=Lgfactor*Lg(i-1)-(vmean-v0)*(1.-Lgfactor)/omegag
-       dForceg=dForceg+sqm1*omegag*Lg(i)*phigp*dtau    ! sign?
+       dForceg=dForceg-sqm1*omegag*    &
+            0.5*(Lg(i)*phigprime(i)+Lg(i-1)*phigprime(i-1))*v0*dtau
        if(.not.real(dForceg).lt.1.e6)write(*,*)'real(dForceg)',real(dForceg)
     enddo
-    if(.false..and.Wg.lt.0)then ! Trapped particle correction and reintegration.
-       Lgb2=Lg(ngz)
-       tbg2=taug(ngz)
+    if(Wg.lt.0)then ! Trapped particle correction and reintegration.
+! In shiftmode the division by the resonant denominator is done
+! outside the routine because it involves complicated negotiation of
+! the resonance to preserve accuracy for trapped particles.
 !       Lg=Lg+exp(sqm1*omegag*taug)*(exp(sqm1*omegag*tbg2)-1.) &
-!            /(1.-exp(2.*sqm1*omegag*tbg2))*Lgb2 ! Prior Trapped bounces.
+!            /(1.-exp(2.*sqm1*omegag*taug(ngz)))*Lg(ngz)
 ! Prior Trapped bounces, simplified expression.
-       Lg=Lg - exp(sqm1*omegag*taug)/(1.+exp(sqm1*omegag*tbg2))*Lgb2 
+!       Lg=Lg - exp(sqm1*omegag*taug)/(1.+exp(sqm1*omegag*taug(ngz)))*Lg(ngz)
+       exptb=exp(sqm1*omegag*2.*taug(ngz))
+       exptbb2=exp(sqm1*omegag*taug(ngz))
        dForceg=0.
+       CapPhig(-ngz)=0.
        do i=-ngz+1,ngz
+          exptau=exp(sqm1*omegag*taug(i))
+          CapPhig(i)=omegag*((1.-exptb)*Lg(i)+exptau*(exptbb2-1.)*Lg(ngz))
           phigp=0.5*(phigprime(i)+phigprime(i-1))
           dtau=taug(i)-taug(i-1)
-          dForceg=dForceg+sqm1*omegag*Lg(i)*phigp*dtau    ! sign?
+          dForceg=+sqm1* (CapPhig(i)*phigprime(i)+CapPhig(i-1)&
+               &*phigprime(i-1))/2. *dtau*vg(0)
        enddo
     endif
   end subroutine LofW
@@ -178,7 +187,7 @@ contains
     integer, parameter :: nw=10
     complex, dimension(-ngz:ngz,nw) :: Lgw
     real, dimension(-ngz:ngz,nw) :: zgw
-    complex :: dForceg(nw),trapsforce(nw)
+    complex :: dForceg(nw),forcet(nw)
     real :: Wn(nw)
     logical :: lplotmz=.true.
     omegag=(2.,0.)
@@ -209,15 +218,23 @@ contains
 ! Testing against shiftmode.
        if(Wg.lt.0)then
           vpsi=sqrt(2.*(Wg-psig))
-          call dFdvpsidvy(vpsi,trapsforce(i),tb,xlent)
-          write(*,*)'dForceg=',dForceg(i),' taug',taug(ngz),' trapsforce',trapsforce(i),'  tb/2',tb/2.,xlent
-          write(*,'(a, 5f10.4)')'Turning position    ',zg(ngz),xlent
-          write(*,'(a, 5f10.4)')'Half-period         ',taug(ngz),tb/2.
-          write(*,'(a, 5f10.6)')'Lg     Lt           ',Lg(ngz),Lt(iend+1)
-          write(*,'(a, 5f10.6)')'dLg    dLt          ',Lg(ngz)-Lg(ngz-1),Lt(iend+1)-Lt(iend)
-          write(*,'(a, 5f10.6)')'Force real,imag     ',dForceg(i),trapsforce(i)
-          
+          call dFdvpsidvy(vpsi,forcet(i),tb,xlent)
+          tdur=tb/2
+          xLend=xlent
+       else
+          vinf=sqrt(2.*Wg)
+          xL=zm
+          call initialize          
+          call dFdvinfdvy(vinf,forcet(i))
+          tdur=tau(nx)
+          xLend=xL
        endif
+       write(*,'(a, 5f10.4)')'End position        ',zg(ngz),xLend
+       write(*,'(a, 5f10.4)')'Time duration       ',taug(ngz),tdur
+       write(*,'(a, 5f10.6)')'Lg     Lt           ',Lg(ngz),Lt(iend+1)
+!       write(*,'(a, 5f10.6)')'dLg    dLt          ',Lg(ngz)-Lg(ngz-1),Lt(iend+1)-Lt(iend)
+       write(*,'(a, 5f10.6)')'Force real,imag     ',dForceg(i),forcet(i)
+          
     enddo
     if(lplotmz)call pltend
     
