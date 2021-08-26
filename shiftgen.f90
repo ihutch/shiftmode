@@ -30,8 +30,8 @@ module shiftgen
   real, dimension(-ngz:ngz) :: zg,vg,ones=1.,phig,phigprime,taug
   complex, dimension(-ngz:ngz) :: Lg,CapPhig
   complex :: omegag=(1.,0.),sqm1=(0.,1.),Ftot
-  real :: psig=.1,Wg,zm=10.,v0
-  integer :: ivs
+  real :: psig=.1,Wg,zm=10.,v0,z0,z1,z2,zR
+  integer :: ivs,iws
 contains
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   subroutine makezg(isigma)
@@ -54,19 +54,19 @@ contains
        if(zR.eq.0.)then
           z2=isigma*zm
        else
-          z2=zR
+          z2=zR*(1.+1.e-4/ngz) ! Force trapped end vg to zero.
        endif
        z1=0.
     else  
        write(*,*)'ERROR psi is zero'
        stop
     endif
-    write(*,*)'makezg: z1,z2,gK',z1,z2,gK
+!    write(*,*)'makezg: z1,z2,gK',z1,z2,gK
     do i=0,ngz
        zi=float(i)/ngz
        zg(i)=ivs*(z1+z2*((2.*gK+zi)*zi)/(1.+2.*gK))
        phig(i)=phigofz(zg(i))
-       vg(i)=-ivs*sqrt(2.*max(0.,Wg-phig(i)))
+       vg(i)=isigma*ivs*sqrt(2.*max(0.,Wg-phig(i)))
        phigprime(i)=phigprimeofz(zg(i))
        if(i.gt.0)then
           zg(-i)=ivs*zg(i)
@@ -75,6 +75,8 @@ contains
           phigprime(-i)=ivs*phigprime(i)
        endif
     enddo
+!    write(*,*)zg(ngz-2),zg(ngz-1),zg(ngz)
+!    write(*,*)vg(ngz-2),vg(ngz-1),vg(ngz)
   end subroutine makezg
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   subroutine orbitend(Wj,z0,zL)
@@ -129,55 +131,77 @@ contains
   ! Integrate Lg dt (=dz/v) to get the differential
   ! force density with respect to vy and vinf when multiplied by
   ! df/dW_parallel.
-    complex :: dForceg,Lgfactor
-    complex :: exptb,exptbb2,exptau
+    complex :: dForceg,Lgfactor,Lgdtau,expdtau,CapPhigdtau
+    complex :: exptbb2,exptau,forcedelta
 
     if(Wg.ge.0.)then
-       v0=sqrt(2.*Wg)
+       v0=-isigma*sqrt(2.*Wg)
     else
        if(Wg-psig.lt.0)stop 'Wg below minimum potential ERROR'
        v0=0.
     endif
     call makezg(isigma)
-    write(*,*)'v0,vg(-ngz)',v0,vg(-ngz),vg(-ngz+1)
+!    write(*,*)'v0,vg(-ngz)',v0,vg(-ngz),vg(-ngz+1)
     taug(-ngz)=0.
     Lg(-ngz)=0.
     dForceg=0.
+    ips=int(sign(1.,psig))
+    iws=0
     do i=-ngz+1,ngz
        phigp=0.5*(phigprime(i)+phigprime(i-1))
        vmean=0.5*(vg(i)+vg(i-1))
-       if(abs(phigp).gt.0.1*abs(vmean))then   ! Use dtau=dv*dtau/dv
-          dtau=abs((vg(i)-vg(i-1))/phigp)
+       if(zR.ne.0.and.abs(vg(i)).lt.0.5*sqrt(2.*max(Wg,Wg-psig)))then
+          dtau=-((vg(i)-vg(i-1))/phigp) ! Use dtau=dv*dtau/dv
+!          write(*,*)'ips',i,ips,zR,psig,Wg
+          if(ips.gt.0)iws=i               ! Reflected track
        else                               ! Use dtau=dx*dtau/dx
-          dtau=(zg(i)-zg(i-1))*vmean/(vg(i-1)*vg(i))
+          dtau=((zg(i)-zg(i-1))*vmean/(vg(i-1)*vg(i)))
+          if(ips.le.0..or.zR.eq.0)iws=i   ! Attracted or unreflected
        endif
+       if(.not.dtau.lt.1e6)write(*,*)i,'dtau=',dtau,v0,vg(i-1)
+       
        if(dtau.gt.10)write(*,*)'JUMP?',phigp,vg(i),vmean
        taug(i)=taug(i-1)+dtau
        Lgfactor=exp(sqm1*omegag*dtau) ! Current exponential
        Lg(i)=Lgfactor*Lg(i-1)-(vmean-v0)*(1.-Lgfactor)/omegag
-       dForceg=dForceg-sqm1*omegag*    &
-            0.5*(Lg(i)*phigprime(i)+Lg(i-1)*phigprime(i-1))*v0*dtau
+       forcedelta=0.5*(phigprime(i)+phigprime(i-1))*( &
+            (Lg(i-1)-(vmean-v0)/(-sqm1*omegag))*(Lgfactor-1)/(sqm1*omegag) &
+            +(vmean-v0)/(-sqm1*omegag)*dtau)*abs(v0)
+       dForceg=dForceg-sqm1*omegag*forcedelta
+! Simple version without step integral correction.       
+!       dForceg=dForceg-sqm1*omegag* 0.5*(Lg(i)*phigprime(i)+Lg(i-1)&
+!            &*phigprime(i-1))*abs(v0)*dtau
        if(.not.real(dForceg).lt.1.e6)write(*,*)'real(dForceg)',real(dForceg)
     enddo
+!    write(*,*)'v0,vmean,phigprime,dtau',v0,vmean,phigprime(ngz/3),dtau,forcedelta
     if(Wg.lt.0)then ! Trapped particle correction and reintegration.
 ! In shiftmode the division by the resonant denominator is done
 ! outside the routine because it involves complicated negotiation of
-! the resonance to preserve accuracy for trapped particles.
-!       Lg=Lg+exp(sqm1*omegag*taug)*(exp(sqm1*omegag*tbg2)-1.) &
-!            /(1.-exp(2.*sqm1*omegag*taug(ngz)))*Lg(ngz)
+! the resonance to preserve accuracy for trapped particles. 
+! So trapped dForceg needs to be divided by ()
 ! Prior Trapped bounces, simplified expression.
 !       Lg=Lg - exp(sqm1*omegag*taug)/(1.+exp(sqm1*omegag*taug(ngz)))*Lg(ngz)
-       exptb=exp(sqm1*omegag*2.*taug(ngz))
+!       exptb=exp(sqm1*omegag*2.*taug(ngz))
        exptbb2=exp(sqm1*omegag*taug(ngz))
        dForceg=0.
        CapPhig(-ngz)=0.
        do i=-ngz+1,ngz
           exptau=exp(sqm1*omegag*taug(i))
-          CapPhig(i)=omegag*((1.-exptb)*Lg(i)+exptau*(exptbb2-1.)*Lg(ngz))
-          phigp=0.5*(phigprime(i)+phigprime(i-1))
           dtau=taug(i)-taug(i-1)
-          dForceg=+sqm1* (CapPhig(i)*phigprime(i)+CapPhig(i-1)&
-               &*phigprime(i-1))/2. *dtau*vg(0)
+          Lgfactor=exp(sqm1*omegag*dtau) ! Current exponential
+          CapPhig(i)=omegag*(exptbb2-1.)*(-(1.+exptbb2)*Lg(i)+exptau*Lg(ngz))
+          if(.false.)then  ! New Force integration
+             Lgdtau=(Lg(i-1)-(vmean-v0)/(-sqm1*omegag))*(Lgfactor-1)&
+                  &/(sqm1*omegag) +(vmean-v0)/(-sqm1*omegag)*dtau
+             expdtau=(Lgfactor-1)*exptau/Lgfactor/(sqm1*omegag)
+             CapPhigdtau=omegag*(exptbb2-1.)*(-(1.+exptbb2)*Lgdtau&
+                  &+expdtau*Lg(ngz))
+             dForceg=dForceg-sqm1*0.5*(phigprime(i)+phigprime(i-1)) &
+                  &*CapPhigdtau*abs(vg(0))
+          else ! Old:
+             dForceg=dForceg -sqm1*0.5*(CapPhig(i)*phigprime(i)+CapPhig(i-1)&
+                  & *phigprime(i-1))*abs(vg(0))*dtau
+          endif
        enddo
     endif
   end subroutine LofW
@@ -186,11 +210,12 @@ contains
     use shiftmode
     integer, parameter :: nw=10
     complex, dimension(-ngz:ngz,nw) :: Lgw
-    real, dimension(-ngz:ngz,nw) :: zgw
+    real, dimension(-ngz:ngz,nw) :: zgw,vgw,taugw
     complex :: dForceg(nw),forcet(nw)
+    integer :: iwsa(nw)
     real :: Wn(nw)
     logical :: lplotmz=.true.
-    omegag=(2.,0.)
+    omegag=(.5,0.)
     omegad=omegag
     psig=-.5
     psi=abs(psig)
@@ -202,41 +227,58 @@ contains
     do i=1,nw
        if(psig.gt.0)Wg=1.1*psig*i/nw
        if(psig.lt.0)Wg=psig+1.42*abs(psig)*i/nw
-       write(*,*)'Wg=',Wg
+       write(*,*)'Wg=',Wg,' omegag=',omegag
        Wn(i)=Wg
        call LofW(Wg,isigma,dForceg(i))
        if(lplotmz)call polymark(zg(-ngz:ngz),Wg*ones(-ngz:ngz),2*ngz+1,i)
+       iwsa(i)=min(iws,ngz)
        Lgw(-ngz:ngz,i)=Lg(-ngz:ngz) ! Save for plotting.
        zgw(-ngz:ngz,i)=zg(-ngz:ngz)
-       write(*,*)'dForceg=',dForceg(i),' taug',taug(ngz)
+       vgw(-ngz:ngz,i)=vg(-ngz:ngz)
+       taugw(-ngz:ngz,i)=taug(-ngz:ngz)
+!       write(*,*)'dForceg=',dForceg(i),' taug',taug(ngz)
 !       write(*,'(10f8.4)')(zg(j),j=-ngz,ngz)
-       write(*,'(10f8.3)')(taug(j),j=-ngz,ngz)
-       write(*,'(10f8.4)')(vg(j),j=-ngz,ngz)
+!       write(*,'(10f8.3)')(taug(j),j=-ngz,ngz)
+!       write(*,'(10f8.4)')(vg(j),j=-ngz,ngz)
 !       write(*,'(10f8.4)')(real(Lg(j)),j=-ngz,ngz)
 !       write(*,'(10f8.4)')(imag(Lg(j)),j=-ngz,ngz)
 !       write(*,*)'dForceg=',dForceg(i),' taug',taug(ngz)
 ! Testing against shiftmode.
        if(Wg.lt.0)then
-          vpsi=sqrt(2.*(Wg-psig))
+          vpsi=-isigma*sqrt(2.*(Wg-psig))
           call dFdvpsidvy(vpsi,forcet(i),tb,xlent)
           tdur=tb/2
           xLend=xlent
-       else
-          vinf=sqrt(2.*Wg)
+       elseif(psig.lt.0)then
+          vinf=-isigma*sqrt(2.*Wg)
           xL=zm
           call initialize          
           call dFdvinfdvy(vinf,forcet(i))
           tdur=tau(nx)
           xLend=xL
        endif
-       write(*,'(a, 5f10.4)')'End position        ',zg(ngz),xLend
+       write(*,'(a, 5f10.5)')'End position        ',zg(ngz),xLend
        write(*,'(a, 5f10.4)')'Time duration       ',taug(ngz),tdur
        write(*,'(a, 5f10.6)')'Lg     Lt           ',Lg(ngz),Lt(iend+1)
-!       write(*,'(a, 5f10.6)')'dLg    dLt          ',Lg(ngz)-Lg(ngz-1),Lt(iend+1)-Lt(iend)
        write(*,'(a, 5f10.6)')'Force real,imag     ',dForceg(i),forcet(i)
           
     enddo
     if(lplotmz)call pltend
+
+    if(psig.lt.0)call pltinit(-zm,zm,0.,-isigma*1.5*sqrt(2.*abs(psig)))
+    if(psig.ge.0)call pltinit(-zm,zm,-1.5*sqrt(2.*abs(psig)),1.5*sqrt(2.*abs(psig)))
+    call axis
+    call axlabels('zg','vg')
+    do i=1,nw
+       call color(i)
+       call polyline(zgw(:,i),vgw(:,i),2*ngz+1)
+       call polyline(zgw(:,i),-isigma*taugw(:,i)/taugw(ngz,i),2*ngz+1)
+!       call polymark(zgw(:,i),taugw(:,i)/taugw(ngz,i),2*ngz+1,10)
+       
+       call polymark(zgw(iwsa(i),i),vgw(iwsa(i),i),1,1)
+    enddo
+    call color(15)
+    call pltend
     
     call multiframe(2,1,3)
     call minmax2(real(Lgw),2*ngz+1,2*ngz+1,nw,amin,amax)
