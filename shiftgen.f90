@@ -190,7 +190,7 @@ contains
           dtau=taug(i)-taug(i-1)
           Lgfactor=exp(sqm1*omegag*dtau) ! Current exponential
           CapPhig(i)=omegag*(exptbb2-1.)*(-(1.+exptbb2)*Lg(i)+exptau*Lg(ngz))
-          if(.false.)then  ! New Force integration
+          if(.false.)then  ! New Force integration not much improvement
              Lgdtau=(Lg(i-1)-(vmean-v0)/(-sqm1*omegag))*(Lgfactor-1)&
                   &/(sqm1*omegag) +(vmean-v0)/(-sqm1*omegag)*dtau
              expdtau=(Lgfactor-1)*exptau/Lgfactor/(sqm1*omegag)
@@ -205,8 +205,12 @@ contains
        enddo
     endif
   end subroutine LofW
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+end module shiftgen
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   subroutine testLofW
+    use shiftgen
     use shiftmode
     integer, parameter :: nw=10
     complex, dimension(-ngz:ngz,nw) :: Lgw
@@ -216,10 +220,9 @@ contains
     real :: Wn(nw)
     logical :: lplotmz=.true.
     omegag=(.5,0.)
-    omegad=omegag
     psig=-.5
+    omegad=omegag
     psi=abs(psig)
-    call initialize
     isigma=-1
     if(lplotmz)call pltinit(-zm,zm,min(0.,psig),max(1.8*psig,.8*abs(psig)))
     if(lplotmz)call axis
@@ -243,14 +246,16 @@ contains
 !       write(*,'(10f8.4)')(real(Lg(j)),j=-ngz,ngz)
 !       write(*,'(10f8.4)')(imag(Lg(j)),j=-ngz,ngz)
 !       write(*,*)'dForceg=',dForceg(i),' taug',taug(ngz)
-! Testing against shiftmode.
-       if(Wg.lt.0)then
-          vpsi=-isigma*sqrt(2.*(Wg-psig))
+! Testing against shiftmode. We must use positive velocity in the
+! shiftmode calculation because it is not set up to use negative
+! integration direction. The sign change is then in the print out. 
+      if(Wg.lt.0)then          
+          vpsi=sqrt(2.*(Wg-psig))
           call dFdvpsidvy(vpsi,forcet(i),tb,xlent)
           tdur=tb/2
           xLend=xlent
        elseif(psig.lt.0)then
-          vinf=-isigma*sqrt(2.*Wg)
+          vinf=sqrt(2.*Wg)
           xL=zm
           call initialize          
           call dFdvinfdvy(vinf,forcet(i))
@@ -259,7 +264,7 @@ contains
        endif
        write(*,'(a, 5f10.5)')'End position        ',zg(ngz),xLend
        write(*,'(a, 5f10.4)')'Time duration       ',taug(ngz),tdur
-       write(*,'(a, 5f10.6)')'Lg     Lt           ',Lg(ngz),Lt(iend+1)
+       write(*,'(a, 5f10.6)')'Lg     Lt           ',Lg(ngz),-isigma*Lt(iend+1)
        write(*,'(a, 5f10.6)')'Force real,imag     ',dForceg(i),forcet(i)
           
     enddo
@@ -312,9 +317,6 @@ contains
     call polyline(Wn,imag(dForceg),nw)
     call pltend
   end subroutine testLofW
-!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-end module shiftgen
-!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 use shiftgen
 call testLofW
