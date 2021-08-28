@@ -42,13 +42,12 @@ contains
     z0=0.
 ! Find any reflection position zR. ! Put equal to 0 if W>max(phi).
     call orbitend(Wg,z0,isigma*zm)
-!    write(*,*)Wg,psig,'Reflection?',z0
     zR=z0
     ivs=-1
     if(psig.gt.0)then ! Repelling potential
        gK=sqrt(max(0.,Wg/psig-1.))
        z1=zR; z2=isigma*zm-zR     ! Or maybe z2=zm
-       if(Wg.lt.psig)ivs=1  ! Reflected orbit, all z are negative.
+       if(Wg.lt.psig)ivs=1  ! Reflected orbit, all z are same sign.
     elseif(psig.lt.0)then !Attracted
        gK=-1.-10.*sqrt(max(0.,-Wg/psig))
        if(zR.eq.0.)then
@@ -75,8 +74,6 @@ contains
           phigprime(-i)=ivs*phigprime(i)
        endif
     enddo
-!    write(*,*)zg(ngz-2),zg(ngz-1),zg(ngz)
-!    write(*,*)vg(ngz-2),vg(ngz-1),vg(ngz)
   end subroutine makezg
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   subroutine orbitend(Wj,z0,zL)
@@ -119,14 +116,15 @@ contains
   end function phigprimeofz
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   subroutine LofW(Wg,isigma,dForceg)
-  ! Calculate the past integral of tau and Lg(tau) and
-  ! vs z for orbit of energy W. Where
+  ! Calculate the past integral of tau and Lg(tau)
+  ! vs z for orbit of energy W, starting at isigma side. Where
   ! Lg= \int_{-\infty}^{t} (v-v_0)*exp(-i*omegag(tau-t)dtau.
   ! For untrapped particles (W>=0), v_0=vinf=sqrt(2*W).
   ! For trapped particles (W<0), v_0=sqrt(2*(W-psig)).  
   ! The integration is done on a z-grid such that dz=v*dtau.
-  ! isigma is the sign of zg at the start of orbit (v-sign -isigma)
-  ! The total needs to account for v-sign=+isigma as well.
+  ! isigma is the sign of zg at the start of orbit (v-sign=-isigma)
+  ! The total needs to account for v-sign=+isigma as well. However,
+  ! for a symmetric hole that just multiplies force by 2. 
 
   ! Integrate Lg dt (=dz/v) to get the differential
   ! force density with respect to vy and vinf when multiplied by
@@ -134,13 +132,15 @@ contains
     complex :: dForceg,Lgfactor,Lgdtau,expdtau,CapPhigdtau
     complex :: exptbb2,exptau,forcedelta
 
+    call makezg(isigma)
     if(Wg.ge.0.)then
        v0=-isigma*sqrt(2.*Wg)
+       vpsig=abs(v0)
     else
        if(Wg-psig.lt.0)stop 'Wg below minimum potential ERROR'
        v0=0.
+       vpsig=abs(vg(0))
     endif
-    call makezg(isigma)
 !    write(*,*)'v0,vg(-ngz)',v0,vg(-ngz),vg(-ngz+1)
     taug(-ngz)=0.
     Lg(-ngz)=0.
@@ -164,45 +164,53 @@ contains
        taug(i)=taug(i-1)+dtau
        Lgfactor=exp(sqm1*omegag*dtau) ! Current exponential
        Lg(i)=Lgfactor*Lg(i-1)-(vmean-v0)*(1.-Lgfactor)/omegag
-       forcedelta=0.5*(phigprime(i)+phigprime(i-1))*( &
+       if(.false.)then
+          forcedelta=0.5*(phigprime(i)+phigprime(i-1))*( &
             (Lg(i-1)-(vmean-v0)/(-sqm1*omegag))*(Lgfactor-1)/(sqm1*omegag) &
-            +(vmean-v0)/(-sqm1*omegag)*dtau)*abs(v0)
-       dForceg=dForceg-sqm1*omegag*forcedelta
+            +(vmean-v0)/(-sqm1*omegag)*dtau)*vpsig
+          dForceg=dForceg-sqm1*omegag*forcedelta
+       else
 ! Simple version without step integral correction.       
-!       dForceg=dForceg-sqm1*omegag* 0.5*(Lg(i)*phigprime(i)+Lg(i-1)&
-!            &*phigprime(i-1))*abs(v0)*dtau
+          dForceg=dForceg-sqm1*omegag* 0.5*(Lg(i)*phigprime(i)+Lg(i-1)&
+               &*phigprime(i-1))*vpsig*dtau
+       endif
        if(.not.real(dForceg).lt.1.e6)write(*,*)'real(dForceg)',real(dForceg)
     enddo
 !    write(*,*)'v0,vmean,phigprime,dtau',v0,vmean,phigprime(ngz/3),dtau,forcedelta
-    if(Wg.lt.0)then ! Trapped particle correction and reintegration.
+    if(Wg.lt.0)then
+    if(.true.)then ! New separate resonant term treatment.
+       exptbb2=exp(sqm1*omegag*taug(ngz))
+! This form is to be divided by (1-exptb) full resonant denominator.
+       dForceg=dForceg*(1.-exptbb2**2) &
+            + sqm1*Lg(ngz)**2*omegag**2*(1.-exptbb2)*vpsig
+    else ! Trapped particle correction and reintegration.
 ! In shiftmode the division by the resonant denominator is done
 ! outside the routine because it involves complicated negotiation of
 ! the resonance to preserve accuracy for trapped particles. 
 ! So trapped dForceg needs to be divided by ()
-! Prior Trapped bounces, simplified expression.
-!       Lg=Lg - exp(sqm1*omegag*taug)/(1.+exp(sqm1*omegag*taug(ngz)))*Lg(ngz)
-!       exptb=exp(sqm1*omegag*2.*taug(ngz))
+! This is based on shiftgen routine. No longer needed. 
        exptbb2=exp(sqm1*omegag*taug(ngz))
        dForceg=0.
        CapPhig(-ngz)=0.
        do i=-ngz+1,ngz
           exptau=exp(sqm1*omegag*taug(i))
           dtau=taug(i)-taug(i-1)
-          Lgfactor=exp(sqm1*omegag*dtau) ! Current exponential
-          CapPhig(i)=omegag*(exptbb2-1.)*(-(1.+exptbb2)*Lg(i)+exptau*Lg(ngz))
+          CapPhig(i)=omegag*(exptbb2-1.)*(-(1.+exptbb2)*Lg(i) +exptau*Lg(ngz))
           if(.false.)then  ! New Force integration not much improvement
+             Lgfactor=exp(sqm1*omegag*dtau) ! Current exponential
              Lgdtau=(Lg(i-1)-(vmean-v0)/(-sqm1*omegag))*(Lgfactor-1)&
                   &/(sqm1*omegag) +(vmean-v0)/(-sqm1*omegag)*dtau
              expdtau=(Lgfactor-1)*exptau/Lgfactor/(sqm1*omegag)
              CapPhigdtau=omegag*(exptbb2-1.)*(-(1.+exptbb2)*Lgdtau&
                   &+expdtau*Lg(ngz))
              dForceg=dForceg-sqm1*0.5*(phigprime(i)+phigprime(i-1)) &
-                  &*CapPhigdtau*abs(vg(0))
+                  &*CapPhigdtau*vpsig
           else ! Old:
              dForceg=dForceg -sqm1*0.5*(CapPhig(i)*phigprime(i)+CapPhig(i-1)&
-                  & *phigprime(i-1))*abs(vg(0))*dtau
+                  & *phigprime(i-1))*vpsig*dtau
           endif
        enddo
+    endif
     endif
   end subroutine LofW
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -250,8 +258,8 @@ end module shiftgen
 ! shiftmode calculation because it is not set up to use negative
 ! integration direction. The sign change is then in the print out. 
       if(Wg.lt.0)then          
-          vpsi=sqrt(2.*(Wg-psig))
-          call dFdvpsidvy(vpsi,forcet(i),tb,xlent)
+          vpsig=sqrt(2.*(Wg-psig))
+          call dFdvpsidvy(vpsig,forcet(i),tb,xlent)
           tdur=tb/2
           xLend=xlent
        elseif(psig.lt.0)then
