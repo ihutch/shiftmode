@@ -129,8 +129,8 @@ contains
   ! Integrate Lg dt (=dz/v) to get the differential
   ! force density with respect to vy and vinf when multiplied by
   ! df/dW_parallel.
-    complex :: dForceg,Lgfactor,Lgdtau,expdtau,CapPhigdtau
-    complex :: exptbb2,exptau,forcedelta
+    complex :: dForceg,Lgfactor
+    complex :: exptbb2
 
     call makezg(isigma)
     if(Wg.ge.0.)then
@@ -164,53 +164,21 @@ contains
        taug(i)=taug(i-1)+dtau
        Lgfactor=exp(sqm1*omegag*dtau) ! Current exponential
        Lg(i)=Lgfactor*Lg(i-1)-(vmean-v0)*(1.-Lgfactor)/omegag
-       if(.false.)then
-          forcedelta=0.5*(phigprime(i)+phigprime(i-1))*( &
-            (Lg(i-1)-(vmean-v0)/(-sqm1*omegag))*(Lgfactor-1)/(sqm1*omegag) &
-            +(vmean-v0)/(-sqm1*omegag)*dtau)*vpsig
-          dForceg=dForceg-sqm1*omegag*forcedelta
-       else
 ! Simple version without step integral correction.       
-          dForceg=dForceg-sqm1*omegag* 0.5*(Lg(i)*phigprime(i)+Lg(i-1)&
+       dForceg=dForceg-sqm1*omegag* 0.5*(Lg(i)*phigprime(i)+Lg(i-1)&
                &*phigprime(i-1))*vpsig*dtau
-       endif
        if(.not.real(dForceg).lt.1.e6)write(*,*)'real(dForceg)',real(dForceg)
     enddo
 !    write(*,*)'v0,vmean,phigprime,dtau',v0,vmean,phigprime(ngz/3),dtau,forcedelta
     if(Wg.lt.0)then
-    if(.true.)then ! New separate resonant term treatment.
        exptbb2=exp(sqm1*omegag*taug(ngz))
 ! This form is to be divided by (1-exptb) full resonant denominator.
        dForceg=dForceg*(1.-exptbb2**2) &
             + sqm1*Lg(ngz)**2*omegag**2*(1.-exptbb2)*vpsig
-    else ! Trapped particle correction and reintegration.
 ! In shiftmode the division by the resonant denominator is done
 ! outside the routine because it involves complicated negotiation of
 ! the resonance to preserve accuracy for trapped particles. 
 ! So trapped dForceg needs to be divided by ()
-! This is based on shiftgen routine. No longer needed. 
-       exptbb2=exp(sqm1*omegag*taug(ngz))
-       dForceg=0.
-       CapPhig(-ngz)=0.
-       do i=-ngz+1,ngz
-          exptau=exp(sqm1*omegag*taug(i))
-          dtau=taug(i)-taug(i-1)
-          CapPhig(i)=omegag*(exptbb2-1.)*(-(1.+exptbb2)*Lg(i) +exptau*Lg(ngz))
-          if(.false.)then  ! New Force integration not much improvement
-             Lgfactor=exp(sqm1*omegag*dtau) ! Current exponential
-             Lgdtau=(Lg(i-1)-(vmean-v0)/(-sqm1*omegag))*(Lgfactor-1)&
-                  &/(sqm1*omegag) +(vmean-v0)/(-sqm1*omegag)*dtau
-             expdtau=(Lgfactor-1)*exptau/Lgfactor/(sqm1*omegag)
-             CapPhigdtau=omegag*(exptbb2-1.)*(-(1.+exptbb2)*Lgdtau&
-                  &+expdtau*Lg(ngz))
-             dForceg=dForceg-sqm1*0.5*(phigprime(i)+phigprime(i-1)) &
-                  &*CapPhigdtau*vpsig
-          else ! Old:
-             dForceg=dForceg -sqm1*0.5*(CapPhig(i)*phigprime(i)+CapPhig(i-1)&
-                  & *phigprime(i-1))*vpsig*dtau
-          endif
-       enddo
-    endif
     endif
   end subroutine LofW
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
