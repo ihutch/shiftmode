@@ -9,7 +9,7 @@ LIBRARIES := $(LIBRARIES) -lmodbess
 LIBDEPS := $(LIBDEPS) libmodbess.a
 COMPILE-SWITCHES:=$(COMPILE-SWITCHES) -Wno-unused-dummy-argument
 #########################################################################
-MODULES=shiftmode.o acpath.o 
+MODULES=shiftmode.o shiftgen.o acpath.o 
 #########################################################################
 # Patterns for compilation etc.
 %.o : %.f makefile ;

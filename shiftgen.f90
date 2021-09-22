@@ -38,7 +38,7 @@
 ! valley psi<0.
 
 module shiftgen
-  integer, parameter :: ngz=100,nge=50
+  integer, parameter :: ngz=100,nge=200
   real, dimension(-ngz:ngz) :: zg,vg,ones=1.,phig,phigprime,taug
   complex, dimension(-ngz:ngz) :: Lg,CapPhig
   complex :: omegag=(1.,0.),sqm1=(0.,1.),Ftot
@@ -46,6 +46,7 @@ module shiftgen
   real :: Wgarray(nge),Wgarrayp(nge),Wgarrayr(nge),vinfarrayp(nge)&
        &,vinfarrayr(nge),tbr(nge),tbp(nge)
   real :: psig=.1,Wg,zm=10.,v0,z0,z1,z2,zR
+  real :: vshift=0.,Tinf=1.,fvinf
   integer :: ivs,iws
 contains
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -75,9 +76,7 @@ contains
        write(*,*)'ERROR psi is zero'
        stop
     endif
-    if(Wg.eq.0)then
-       write(*,*)'ZeroWg',z1,z2,gK,zR
-    endif
+!    if(Wg.eq.0)write(*,*)'ZeroWg',z1,z2,gK,zR
 !    write(*,*)'makezg: z1,z2,gK',z1,z2,gK
     do i=0,ngz
        zi=float(i)/ngz
@@ -130,6 +129,8 @@ contains
     enddo
   end subroutine orbitend
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+! If some different form of phi is required. Replace these functions,
+! e.g. with forms that call functions outside the module. 
   real function phigofz(zval)
     phigofz=psig/cosh(zval/4.)**4
   end function phigofz
@@ -152,30 +153,32 @@ contains
   ! Integrate Lg dt (=dz/v) to get the differential
   ! force density with respect to vy and vinf when multiplied by
   ! df/dW_parallel.
-    complex :: dForceg,Lgfactor
+    complex :: dForceg,Lgfactor,dFordirect,CPfactor
     complex :: exptbb2
 
     Wg=Wgi
+    v0=-isigma*sqrt(2.*Wg)
+    vpsig=abs(v0)
     call makezg(isigma)
     if(psig.gt.0.)then                ! Repelling hill. 
-       if(Wg.gt.phigofz(zm))then      ! Sufficiently positive Wg
-          v0=-isigma*sqrt(2.*Wg)
-          vpsig=abs(v0)
-       else                           ! Negative W or orbit beyond z-domain.
-          write(*,*)'Orbit beyond z. Wg=',Wg
+       if(Wg.le.phigofz(zm))then      ! Negative W or orbit beyond z-domain.
+!          write(*,*)'Orbit beyond z. Wg=',Wg
           dForceg=0.
           Lg=0.
           return
        endif
     else                               ! Attracting valley.
        if(Wg-psig.lt.0)stop 'Wg below minimum potential ERROR'
-       v0=0.
-       vpsig=abs(vg(0))
+       if(Wg.lt.0.)then
+          v0=0.
+          vpsig=abs(vg(0))
+       endif
     endif
 !    write(*,*)'v0,vg(-ngz)',v0,vg(-ngz),vg(-ngz+1)
     taug(-ngz)=0.
     Lg(-ngz)=0.
     dForceg=0.
+    dFordirect=0.
     ips=int(sign(1.,psig))
     iws=0
     do i=-ngz+1,ngz
@@ -204,6 +207,14 @@ contains
           write(*,*)i,Wg,phigp,vpsig,dtau,vg(i),vg(i-1),zR
           stop
        endif
+       if(.false.)then   ! Test section
+          CPfactor=exp(sqm1*omegag*dtau) ! Current exponential
+          CapPhig(i)=CPfactor*CapPhig(i-1)-phigp*(1.-CPfactor)*sqm1/omegag
+          dFordirect=dFordirect-sqm1*&
+               0.5*(CapPhig(i)*phigprime(i)+CapPhig(i-1)*phigprime(i-1))&
+               *abs(vg(-ngz)*dtau)
+          write(*,*)dForceg,dFordirect
+       endif
     enddo
     if(Wg.lt.0)then     ! Trapped orbit. Add resonant term. 
        exptbb2=exp(sqm1*omegag*taug(ngz))
@@ -216,26 +227,75 @@ contains
 ! outside the routine because it involves complicated negotiation of
 ! the resonance to preserve accuracy for trapped particles. 
     elseif(Wg.lt.psig)then  ! Reflected orbit. Add integration correction.
-       dForceg=dForceg+sqm1*2.*vg(-ngz)**2*vpsig
+       dForceg=dForceg+sqm1*2.*vg(-ngz)**2*vpsig      !  *omegag
     endif
   end subroutine LofW
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  subroutine Fdirect(Wgi,isigma,dForceg)
+! Alternate force integration not using v-integration by parts
+! dF/dv/xi/(omega df/dW)=(i)\int -dphi/dz|_t \int^t (-dphi/dz|_tau)
+!          exp(-i omega(tau-t)) dtau |dz(t)|        where dz(t)=v(t)dt.
+! But if we want the contribution per dvinf, dv/dvinf=vinf/v so that 
+! dF/dvinf/xi/(omega df/dW)=(i)\int -dphi/dz|_t \int^t (-dphi/dz|_tau)
+!          exp(-i omega(tau-t)) dtau |vinf dt|.
+! Inner integral is CapPhi=\int^t (-dphi/dz|_tau) exp(-i omega(tau-t)) dtau 
+! done as exp(-i omega(tau-t)) dtau = d[exp()]/(-i omega)
+    complex :: dForceg,CPfactor
+    
+! Only for repelling hill at present
+    if(psig.le.0)return
+    Wg=Wgi
+    call makezg(isigma) ! Sets various time array values.
+    ips=int(sign(1.,psig))
+    iws=0
+    taug(-ngz)=0.
+    CapPhig(-ngz)=0.
+    dForceg=0.
+    do i=-ngz+1,ngz
+       phigp=0.5*(phigprime(i)+phigprime(i-1))
+       vmean=0.5*(vg(i)+vg(i-1))
+! Calculate dtau
+       if(zR.ne.0.and.abs(vg(i)).le.0.5*sqrt(2.*max(Wg,Wg-psig)))then
+          dtau=-((vg(i)-vg(i-1))/phigp) ! Use dtau=dv*dtau/dv
+          if(ips.gt.0)iws=i               ! Reflected track
+       else                               ! Use dtau=dx*dtau/dx
+          dtau=((zg(i)-zg(i-1))*vmean/(vg(i-1)*vg(i)))
+          if(ips.le.0..or.zR.eq.0)iws=i   ! Attracted or unreflected
+       endif
+       if(.not.dtau.lt.1e6)then
+          write(*,*)i,'dtau=',dtau,v0,vg(i-1),vg(i),zR,Wg,vpsig,phigp
+          stop
+       endif
+       taug(i)=taug(i-1)+dtau
+       CPfactor=exp(sqm1*omegag*dtau) ! Current exponential
+       CapPhig(i)=CPfactor*CapPhig(i-1)-phigp*(1.-CPfactor)*sqm1/omegag
+       dForceg=dForceg-sqm1*&
+            0.5*(CapPhig(i)*phigprime(i)+CapPhig(i-1)*phigprime(i-1))&
+            *abs(vg(-ngz)*dtau)
+!       write(*,'(a,i4,8f10.5)')'CapPhiStep',i,taug(i),zg(i),CapPhig(i),dForceg
+    enddo
+    write(*,'(a,8f10.5)')'Direct tau',taug(ngz),zg(ngz),dForceg
+  end subroutine Fdirect
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   subroutine FgRepelEint(Ftotalg,isigma)
 ! Integrate the force over energy to obtain the full parallel distribution
 ! This version ignores possible dependence on v-perp (for now). 
-! Just for positive (repelling) psig.
+! Just for positive (repelling) psig. isigma is the entering z-sign.
+! For symmetric potentials and f(v), the returned Ftotalg can simply be
+! doubled to give the total force since then it is symmetric in isigma.
     complex Ftotalg,Ftotalpg,Ftotalrg
     Emaxg=5.
     do i=1,nge  ! Passing
        Wgarray(i)=psig+Emaxg*(i/float(nge))**2
        vinfarrayp(i)=-isigma*sqrt(2.*Wgarray(i))
        call LofW(Wgarray(i),isigma,Forcegarray(i))
-       if(i.eq.1)then
-          dvinf=vinfarrayp(i)-sqrt(2.*psig)
+       if(i.eq.1)then  ! Start of integration
+          dvinf=abs(vinfarrayp(i))-sqrt(2.*psig)
           Ftotalpg=Forcegarray(i)*dfdWpar(vinfarrayp(i))&
                &*dvinf*omegag
        else
-          dvinf=vinfarrayp(i)-vinfarrayp(i-1)
+          dvinf=abs(vinfarrayp(i)-vinfarrayp(i-1))
           Ftotalpg=Ftotalpg+0.5*(Forcegarray(i)*dfdWpar(vinfarrayp(i)) &
                +Forcegarray(i-1)*dfdWpar(vinfarrayp(i-1)))*dvinf*omegag
        endif
@@ -248,29 +308,51 @@ contains
        vinfarrayr(i)=-isigma*sqrt(2.*Wgarray(i))
        call LofW(Wgarray(i),isigma,Forcegarray(i))
        if(i.eq.1)then
-          dvinf=(vinfarrayr(i)-sqrt(2.*psig))
-          Ftotalrg=Forcegarray(i)*dvinf*dfdWpar(vinfarrayr(i))&
-               &**omegag
+          dvinf=abs(vinfarrayr(i))-sqrt(2.*psig)
+          Ftotalrg=Forcegarray(i)*dvinf*dfdWpar(vinfarrayr(i))*omegag
        else
-          dvinf=vinfarrayr(i)-vinfarrayr(i-1)
+          dvinf=abs(vinfarrayr(i)-vinfarrayr(i-1))
           Ftotalrg=Ftotalrg+0.5*(Forcegarray(i)*dfdWpar(vinfarrayr(i)) &
                +Forcegarray(i-1)*dfdWpar(vinfarrayr(i-1)))*dvinf*omegag
        endif
        Forcegr(i)=Forcegarray(i)*omegag*dfdWpar(vinfarrayr(i))
        tbr(i)=taug(ngz)
     enddo
+!    write(*,'(i3,6f10.4)')50,vinfarrayr(50),Forcegarray(50),Forcegr(50)&
+!         ,dfdWpar(vinfarrayr(50))
     Wgarrayr=Wgarray
     Ftotalg=Ftotalpg+Ftotalrg
   end subroutine FgRepelEint
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   real function dfdWpar(vinf)
 ! The derivative of the distant distribution func wrt energy W at 
-! velocity vinf, in the rest frame of the hole. Example. Maxwellian
-! of temperature T. f=exp(-vinv^2/2T)/sqrt(2 pi T)
-    Tinf=1.
-    dfdWpar=-exp(-vinf**2/(2.*Tinf))*vinf/Tinf/sqrt(3.1415926*Tinf)
+! velocity vinf, in the rest frame of the hole. 
+! Example. Maxwellian of temperature T. f=exp(-vinv^2/2T)/sqrt(2 pi T)
+!    dfdWpar=-exp(-vinf**2/(2.*Tinf))/Tinf/sqrt(2.*3.1415926*Tinf)
+! Two half-density Maxwellians symmetrically shifted by vshift
+! f=0.5*(exp(-(vinv-vshift)^2/2T)+exp(-(vinv+vshift)^2/2T))/sqrt(2 pi T))
+    e1=exp(-(vinf-vshift)**2/(2.*Tinf))
+    e2=exp(-(vinf+vshift)**2/(2.*Tinf))
+    fvinf=0.5*(e1+e2)/sqrt(2.*3.1415926*Tinf)
+    dfdWpar=0.5*(-e1*(vinf-vshift)-e2*(vinf+vshift)) &
+         &/sign(max(abs(vinf*Tinf),1.e-6),vinf)/sqrt(2.*3.1415926*Tinf)
+
   end function dfdwpar
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  subroutine fvinfplot
+! Do not call if vinfarray is already in use!
+    character*10 string
+    do i=1,nge
+       vinfarrayp(i)=-zm+2.*i/zm
+       blah=dfdWpar(vinfarrayp(i))
+       vinfarrayr(i)=fvinf   ! This is really f, not v.
+    enddo
+    call autoplot(vinfarrayp,vinfarrayr,nge)
+    call axlabels('v','f!di!A;!@!d')
+    call fwrite(vshift,iwidth,2,string)
+    call legendline(0.1,0.9,258,'v!ds!d='//string(1:iwidth))
+    call pltend
+  end subroutine fvinfplot
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   subroutine pathshiftg(i,obi)
@@ -301,171 +383,3 @@ contains
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 end module shiftgen
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
-
-!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  subroutine testLofW
-    use shiftgen
-    use shiftmode
-    integer, parameter :: nw=60
-    complex, dimension(-ngz:ngz,nw) :: Lgw
-    real, dimension(-ngz:ngz,nw) :: zgw,vgw,taugw
-    complex :: dForceg(nw),forcet(nw)
-    integer :: iwsa(nw)
-    real :: Wn(nw)
-    logical :: lplotmz=.true.
-    omegag=(.9,0.02)
-    psig=.5
-    omegad=omegag
-    psi=abs(psig)
-    isigma=-1
-    if(lplotmz)call pltinit(-zm,zm,min(0.,psig),max(1.8*psig,.8*abs(psig)))
-    if(lplotmz)call axis
-    if(lplotmz)call axlabels('z','W')
-    do i=1,nw
-       if(psig.gt.0)Wg=1.1*psig*i/nw
-       if(psig.lt.0)Wg=psig+1.42*abs(psig)*i/nw
-       write(*,*)'Wg=',Wg,' omegag=',omegag
-       Wn(i)=Wg
-       call LofW(Wg,isigma,dForceg(i))
-       if(lplotmz)call color(mod(i-1,15)+1)
-       if(lplotmz)call polymark(zg(-ngz:ngz),Wg*ones(-ngz:ngz),2*ngz+1,10)
-       iwsa(i)=min(iws,ngz)
-       Lgw(-ngz:ngz,i)=Lg(-ngz:ngz) ! Save for plotting.
-       zgw(-ngz:ngz,i)=zg(-ngz:ngz)
-       vgw(-ngz:ngz,i)=vg(-ngz:ngz)
-       if(Wg.gt.0.and.Wg.lt.psig)Lgw(:,i)=Lg+(vg-vg(-ngz))/omegag
-       taugw(-ngz:ngz,i)=taug(-ngz:ngz)
-!       write(*,*)'dForceg=',dForceg(i),' taug',taug(ngz)
-!       write(*,'(10f8.4)')(zg(j),j=-ngz,ngz)
-!       write(*,'(10f8.3)')(taug(j),j=-ngz,ngz)
-!       write(*,'(10f8.4)')(vg(j),j=-ngz,ngz)
-!       write(*,'(10f8.4)')(real(Lg(j)),j=-ngz,ngz)
-!       write(*,'(10f8.4)')(imag(Lg(j)),j=-ngz,ngz)
-!       write(*,*)'dForceg=',dForceg(i),' taug',taug(ngz)
-! Testing against shiftmode. We must use positive velocity in the
-! shiftmode calculation because it is not set up to use negative
-! integration direction. The sign change is then in the print out. 
-      if(Wg.lt.0)then          
-          vpsig=sqrt(2.*(Wg-psig))
-          call dFdvpsidvy(vpsig,forcet(i),tb,xlent)
-          tdur=tb/2
-          xLend=xlent
-       elseif(psig.lt.0)then
-          vinf=sqrt(2.*Wg)
-          xL=zm
-          call initialize          
-          call dFdvinfdvy(vinf,forcet(i))
-          tdur=tau(nx)
-          xLend=xL
-       endif
-       write(*,'(a, 5f10.5)')'End position        ',zg(ngz),xLend
-       write(*,'(a, 5f10.4)')'Time duration       ',taug(ngz),tdur
-       write(*,'(a, 5f10.6)')'Lg     Lt           ',Lg(ngz),-isigma*Lt(iend+1)
-       write(*,'(a, 5f10.6)')'Force real,imag     ',dForceg(i),forcet(i)
-          
-    enddo
-    if(lplotmz)call pltend
-
-    call pfset(3)
-    call multiframe(2,1,0)
-    if(psig.lt.0)call pltinit(-zm,zm,0.,-isigma*1.5*sqrt(2.*abs(psig)))
-    if(psig.ge.0)call pltinit(-zm,zm,-1.5*sqrt(2.*abs(psig)),1.5*sqrt(2.*abs(psig)))
-    call axis
-    call axlabels('zg','vg')
-    do i=1,nw
-       call color(mod(i-1,15)+1)
-       call polyline(zgw(:,i),vgw(:,i),2*ngz+1)
-!       call polyline(zgw(:,i),-isigma*taugw(:,i)/taugw(ngz,i),2*ngz+1)
-!       call polymark(zgw(:,i),taugw(:,i)/taugw(ngz,i),2*ngz+1,10)
-       
-       call polymark(zgw(iwsa(i),i),vgw(iwsa(i),i),1,1)
-    enddo
-    call color(15)
-
-    call minmax2(taugw,2*ngz+1,2*ngz+1,nw,tmin,tmax)
-    call pltinit(-zm,zm,0.,tmax)
-    call axis
-    call axlabels('zg','tau')
-    do i=1,nw
-       call color(mod(i-1,15)+1)
-       call polyline(zgw(:,i),taugw(:,i),2*ngz+1)
-    enddo
-    call pltend
-
-    call multiframe(2,1,3)
-    call minmax2(real(Lgw),2*ngz+1,2*ngz+1,nw,amin,amax)
-    call pltinit(-zm,zm,amin,amax)
-    call axis
-    call axlabels('z','Real(Lg)')
-    do i=1,nw
-       call color(mod(i-1,15)+1)
-       call polyline(zgw(-ngz:ngz,i),real(Lgw(-ngz:ngz,i)),2*ngz+1)
-!       call polymark(zgw(-ngz:ngz,i),real(Lgw(-ngz:ngz,i)),2*ngz+1,i)
-    enddo
-    call color(15)
-    call minmax2(imag(Lgw),2*ngz+1,2*ngz+1,nw,amin,amax)
-    call pltinit(-zm,zm,amin,amax)
-    call axis
-    call axlabels('z','Imag(Lg)')
-    do i=1,nw
-       call color(mod(i-1,15)+1)
-       call polyline(zgw(-ngz:ngz,i),imag(Lgw(-ngz:ngz,i)),2*ngz+1)
-!       call polymark(zgw(-ngz:ngz,i),imag(Lgw(-ngz:ngz,i)),2*ngz+1,i)
-    enddo
-    call pltend
-    call multiframe(0,0,0)
-
-    call minmax(dForceg,2*nw,amin,amax)
-    call pltinit(Wn(1),Wn(nw),amin,amax)
-    call axis
-    call axlabels('W','Force')
-    call polyline(Wn,real(dForceg),nw)
-    call dashset(1)
-    call polyline(Wn,imag(dForceg),nw)
-    call dashset(0)
-    call pltend
-  end subroutine testLofW
-!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  subroutine testFrepel
-    use shiftgen
-    complex :: Ftotalg
-    omegag=(1.,0.01)
-    psig=.5
-    isigma=-1    
-    call FgRepelEint(Ftotalg,isigma)
-    
-    call pltinit(vinfarrayr(nge),vinfarrayp(nge),0.,Wgarrayp(nge))
-    call axis
-    call polymark(vinfarrayp,Wgarrayp,nge,1)
-    call polyline(vinfarrayp,Wgarrayp,nge)
-    call polyline(vinfarrayr,Wgarrayr,nge)
-    call polymark(vinfarrayr,Wgarrayr,nge,2)
-    call polyline(vinfarrayp,tbp/10.,nge)
-    call polyline(vinfarrayr,tbr/10.,nge)
-    call legendline(.2,.9,0,' tb')
-    call axlabels('vinf','Wg')
-    call pltend
-!    write(*,*)forcegr,forcegp
-    call minmax(forcegp,2*nge,pmin,pmax)
-    call minmax(forcegr,2*nge,rmin,rmax)
-    call pltinit(vinfarrayr(nge),vinfarrayp(nge),min(pmin,rmin),max(pmax,rmax))
-    call axis
-    call axlabels('vinf','force')
-    call polyline(vinfarrayr,real(forcegr),nge)
-    call polymark(vinfarrayr,real(forcegr),nge,1)
-    call polyline(vinfarrayr,imag(forcegr),nge)
-    call polymark(vinfarrayr,imag(forcegr),nge,2)
-    call polyline(vinfarrayp,real(forcegp),nge)
-    call polymark(vinfarrayp,real(forcegp),nge,1)
-    call polyline(vinfarrayp,imag(forcegp),nge)
-    call polymark(vinfarrayp,imag(forcegp),nge,2)
-    call legendline(.6,.7,1,' real')
-    call legendline(.6,.8,2,' imag')
-    call pltend
-  end subroutine testFrepel
-!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-!  call testLofW
-  call testFrepel
-end program
