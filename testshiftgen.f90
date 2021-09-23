@@ -11,7 +11,7 @@
     integer :: iwsa(nw)
     real :: Wn(nw)
     logical :: lplotmz=.true.
-    omegag=(.9,0.02)
+    omegag=(10.,0.02)
     psig=.5
     omegad=omegag
     psi=abs(psig)
@@ -25,7 +25,8 @@
        write(*,*)'Wg=',Wg,' omegag=',omegag
        Wn(i)=Wg
        call LofW(Wg,isigma,dForceg(i))
-       call Fdirect(Wg,isigma,dFdirect(i))
+       dFdirect(i)=dFordirect
+!       call Fdirect(Wg,isigma,dFdirect(i))
        if(lplotmz)call color(mod(i-1,15)+1)
        if(lplotmz)call polymark(zg(-ngz:ngz),Wg*ones(-ngz:ngz),2*ngz+1,10)
        iwsa(i)=min(iws,ngz)
@@ -200,6 +201,7 @@
     call dashset(1)
     call polyline(or,imag(frcomplex),nor)
     call legendline(.1,.2,0,' imag')
+    call dashset(0)
     call pltend
   end subroutine Frepelofomega
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -211,13 +213,17 @@
        if(argument(1:2).eq.'-p')read(argument(3:),*)psig
        if(argument(1:2).eq.'-v')read(argument(3:),*)vshift
        if(argument(1:2).eq.'-i')read(argument(3:),*)isigma
+       if(argument(1:3).eq.'-zm')read(argument(4:),*)zm
        if(argument(1:3).eq.'-or')read(argument(4:),*)ormax
        if(argument(1:3).eq.'-oi')read(argument(4:),*)oi
+       if(argument(1:2).eq.'-h')goto 1
     enddo
+    return
+1   write(*,'(a,f8.3,a,f8.3,a,f8.3,a,f8.3)')'psi=',psig,' zm=',zm,' omax=',ormax
   end subroutine tsparse
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
        
-!  call testLofW
+  call testLofW
 !  call testFrepel
-  call Frepelofomega
+!  call Frepelofomega
 end program

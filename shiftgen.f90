@@ -38,10 +38,10 @@
 ! valley psi<0.
 
 module shiftgen
-  integer, parameter :: ngz=100,nge=200
+  integer, parameter :: ngz=30,nge=100
   real, dimension(-ngz:ngz) :: zg,vg,ones=1.,phig,phigprime,taug
   complex, dimension(-ngz:ngz) :: Lg,CapPhig
-  complex :: omegag=(1.,0.),sqm1=(0.,1.),Ftot
+  complex :: omegag=(1.,0.),sqm1=(0.,1.),Ftot,dFordirect
   complex :: omegabg(nge),Forcegarray(nge),Forcegp(nge),Forcegr(nge)
   real :: Wgarray(nge),Wgarrayp(nge),Wgarrayr(nge),vinfarrayp(nge)&
        &,vinfarrayr(nge),tbr(nge),tbp(nge)
@@ -153,9 +153,10 @@ contains
   ! Integrate Lg dt (=dz/v) to get the differential
   ! force density with respect to vy and vinf when multiplied by
   ! df/dW_parallel.
-    complex :: dForceg,Lgfactor,dFordirect,CPfactor
-    complex :: exptbb2
-
+    complex :: dForceg,Lgfactor,CPfactor
+    complex :: exptbb2,ddF1,ddF2,ddF3
+    logical ldirect
+    
     Wg=Wgi
     v0=-isigma*sqrt(2.*Wg)
     vpsig=abs(v0)
@@ -197,23 +198,28 @@ contains
        endif
        if(dtau.gt.10)write(*,*)'JUMP?',phigp,vg(i),vmean
        taug(i)=taug(i-1)+dtau
-       Lgfactor=exp(sqm1*omegag*dtau) ! Current exponential
-       Lg(i)=Lgfactor*Lg(i-1)-(vmean-v0)*(1.-Lgfactor)/omegag
-! Simple version without step integral correction.       
-       dForceg=dForceg-sqm1*omegag* 0.5*(Lg(i)*phigprime(i)+Lg(i-1)&
+!       Lgfactor=exp(sqm1*omegag*dtau) ! Current exponential
+          CPfactor=exp(sqm1*omegag*dtau) ! Current exponential
+          CapPhig(i)=CPfactor*CapPhig(i-1)-phigp*(1.-CPfactor)*sqm1/omegag
+          ddF1=-sqm1*0.5*(CapPhig(i)*phigprime(i)+CapPhig(i-1)&
+               &*phigprime(i-1)) *abs(vg(-ngz)*dtau)
+          ddF3=(CPfactor-1.)/(sqm1*omegag)
+          ddF2=-sqm1*phigp*(ddF3*CapPhig(i-1)-phigp*(dtau-ddF3)&
+               &*sqm1/omegag) *abs(vg(-ngz))  ! Integral corrected.
+          dFordirect=dFordirect+ddF2
+          Lg(i)=CPfactor*Lg(i-1)-(vmean-v0)*(1.-CPfactor)/omegag
+! Old simple version without step integral correction.
+          ddF1=-sqm1*omegag*0.5*(Lg(i)*phigprime(i)+Lg(i-1)&
                &*phigprime(i-1))*vpsig*dtau
+! Integral corrected version(s) is incorrect for reflected particles.
+          ddF2=-sqm1*phigp*(ddF3*Lg(i-1)*omegag+(vmean-v0)*(dtau-ddF3) &
+               &*sqm1/omegag) *abs(vg(-ngz))  ! Integral corrected.
+          dForceg=dForceg+ddF1
+!          write(*,*)dForceg,dFordirect
        if(.not.real(dForceg).lt.1.e6)then
           write(*,*)'real(dForceg)',real(dForceg)
           write(*,*)i,Wg,phigp,vpsig,dtau,vg(i),vg(i-1),zR
           stop
-       endif
-       if(.false.)then   ! Test section
-          CPfactor=exp(sqm1*omegag*dtau) ! Current exponential
-          CapPhig(i)=CPfactor*CapPhig(i-1)-phigp*(1.-CPfactor)*sqm1/omegag
-          dFordirect=dFordirect-sqm1*&
-               0.5*(CapPhig(i)*phigprime(i)+CapPhig(i-1)*phigprime(i-1))&
-               *abs(vg(-ngz)*dtau)
-          write(*,*)dForceg,dFordirect
        endif
     enddo
     if(Wg.lt.0)then     ! Trapped orbit. Add resonant term. 
@@ -275,7 +281,7 @@ contains
             *abs(vg(-ngz)*dtau)
 !       write(*,'(a,i4,8f10.5)')'CapPhiStep',i,taug(i),zg(i),CapPhig(i),dForceg
     enddo
-    write(*,'(a,8f10.5)')'Direct tau',taug(ngz),zg(ngz),dForceg
+    write(*,'(a,8f10.5)')'Direct tau',taug(ngz),zg(ngz),dForceg,vg(-ngz)
   end subroutine Fdirect
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   subroutine FgRepelEint(Ftotalg,isigma)
