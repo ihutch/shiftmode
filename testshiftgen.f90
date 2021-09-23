@@ -25,8 +25,8 @@
        write(*,*)'Wg=',Wg,' omegag=',omegag
        Wn(i)=Wg
        call LofW(Wg,isigma,dForceg(i))
-       dFdirect(i)=dFordirect
-!       call Fdirect(Wg,isigma,dFdirect(i))
+!       dFdirect(i)=dFordirect
+       call Fdirect(Wg,isigma,dFdirect(i))
        if(lplotmz)call color(mod(i-1,15)+1)
        if(lplotmz)call polymark(zg(-ngz:ngz),Wg*ones(-ngz:ngz),2*ngz+1,10)
        iwsa(i)=min(iws,ngz)
