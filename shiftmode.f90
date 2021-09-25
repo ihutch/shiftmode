@@ -7,7 +7,7 @@ module shiftmode
 !  integer, parameter :: nx=50, ne=400, nvy=30  ! fcontko highres
 !  integer, parameter :: nx=100, ne=800, nvy=30  ! Low omegai
 !  integer, parameter :: nx=300, ne=400, nvy=30  ! Low omegai
-  integer, parameter :: nx=200, ne=200, nvy=30  ! High space resolution
+  integer, parameter :: nx=100, ne=200, nvy=30  ! High space resolution
   real, parameter :: pi=3.1415926, sq2pi=sqrt(2.*3.1415926)
   real :: psi=.1,pL=4.,k=.01, Ty=1.         ! psi, sech4width, k, Ty
   real :: xL=20.,Emax=4.,vymnorm=4.,vymax   ! Hole length, Energy, v_y

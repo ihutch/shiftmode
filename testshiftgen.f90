@@ -11,8 +11,8 @@
     integer :: iwsa(nw)
     real :: Wn(nw)
     logical :: lplotmz=.true.
-    omegag=(10.,0.02)
-    psig=.5
+    omegag=(5.,0.02)
+    psig=-.5
     omegad=omegag
     psi=abs(psig)
     isigma=-1
@@ -62,7 +62,7 @@
        write(*,'(a, 5f10.4)')'Time duration       ',taug(ngz),tdur
        write(*,'(a, 5f10.6)')'Lg     Lt           ',Lg(ngz),-isigma*Lt(iend+1)
        write(*,'(a, 5f10.6)')'Forceg  real,imag     ',dForceg(i),forcet(i)
-       if(psig.gt.0)write(*,'(a, 5f10.6)')'Fdirect real,imag     ',dFdirect(i)
+       write(*,'(a, 5f10.6)')'Fdirect real,imag     ',dFdirect(i)
           
     enddo
     if(lplotmz)call pltend

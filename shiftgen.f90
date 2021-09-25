@@ -38,7 +38,7 @@
 ! valley psi<0.
 
 module shiftgen
-  integer, parameter :: ngz=100,nge=100
+  integer, parameter :: ngz=200,nge=100
   real, dimension(-ngz:ngz) :: zg,vg,ones=1.,phig,phigprime,taug
   complex, dimension(-ngz:ngz) :: Lg,CapPhig
   complex :: omegag=(1.,0.),sqm1=(0.,1.),Ftot,dFordirect
@@ -153,9 +153,8 @@ contains
   ! Integrate Lg dt (=dz/v) to get the differential
   ! force density with respect to vy and vinf when multiplied by
   ! df/dW_parallel.
-    complex :: dForceg,Lgfactor,CPfactor
+    complex :: dForceg,CPfactor
     complex :: exptbb2,ddF1,ddF2,ddF3
-    logical ldirect
     
     Wg=Wgi
     v0=-isigma*sqrt(2.*Wg)
@@ -211,12 +210,12 @@ contains
 ! Old simple version without step integral correction.
           ddF1=-sqm1*omegag*0.5*(Lg(i)*phigprime(i)+Lg(i-1)&
                &*phigprime(i-1))*vpsig*dtau
-! Integral corrected version(s) is incorrect for reflected particles.
+! Integral corrected version is incorrect for reflected particles.
           ddF2=-sqm1*phigp*(ddF3*Lg(i-1)*omegag+(vmean-v0)*(dtau-ddF3) &
                &*sqm1/omegag) *abs(vg(-ngz))  ! Integral corrected.
-!          dForceg=dForceg+ddF1
-          dForceg=dForceg-sqm1*omegag* 0.5*(Lg(i)*phigprime(i)+Lg(i-1)&
-               &*phigprime(i-1))*vpsig*dtau
+          dForceg=dForceg+ddF1
+!          dForceg=dForceg-sqm1*omegag* 0.5*(Lg(i)*phigprime(i)+Lg(i-1)&
+!               &*phigprime(i-1))*vpsig*dtau
 !          write(*,*)dForceg,dFordirect
        if(.not.real(dForceg).lt.1.e6)then
           write(*,*)'real(dForceg)',real(dForceg)
@@ -241,7 +240,7 @@ contains
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   subroutine Fdirect(Wgi,isigma,dForceg)
-! Alternate force integration not using v-integration by parts
+! Force integration not using v-integration by parts
 ! dF/dv/xi/(omega df/dW)=(i)\int -dphi/dz|_t \int^t (-dphi/dz|_tau)
 !          exp(-i omega(tau-t)) dtau |dz(t)|        where dz(t)=v(t)dt.
 ! But if we want the contribution per dvinf, dv/dvinf=vinf/v so that 
@@ -249,14 +248,15 @@ contains
 !          exp(-i omega(tau-t)) dtau |vinf dt|.
 ! Inner integral is CapPhi=\int^t (-dphi/dz|_tau) exp(-i omega(tau-t)) dtau 
 ! done as exp(-i omega(tau-t)) dtau = d[exp()]/(-i omega)
-    complex :: dForceg,CPfactor
+    complex :: dForceg,CPfactor,exptbb2
     
-! Only for repelling hill at present
-    if(psig.le.0)return
+!    if(psig.le.0)return ! When restricted to repelling hills. 
     Wg=Wgi
     call makezg(isigma) ! Sets various time array values.
+    vpsig=vg(-ngz)            ! Untrapped default ...
+    if(Wg.lt.0.)vpsig=vg(0)   ! Trapped particle f(v) reference.
     ips=int(sign(1.,psig))
-    iws=0
+    iws=0                     ! dtau algorithm switch index (plotting only)
     taug(-ngz)=0.
     CapPhig(-ngz)=0.
     dForceg=0.
@@ -271,18 +271,26 @@ contains
           dtau=((zg(i)-zg(i-1))*vmean/(vg(i-1)*vg(i)))
           if(ips.le.0..or.zR.eq.0)iws=i   ! Attracted or unreflected
        endif
-       if(.not.dtau.lt.1e6)then
-          write(*,*)i,'dtau=',dtau,v0,vg(i-1),vg(i),zR,Wg,vpsig,phigp
-          stop
-       endif
        taug(i)=taug(i-1)+dtau
        CPfactor=exp(sqm1*omegag*dtau) ! Current exponential
        CapPhig(i)=CPfactor*CapPhig(i-1)-phigp*(1.-CPfactor)*sqm1/omegag
        dForceg=dForceg-sqm1*&
             0.5*(CapPhig(i)*phigprime(i)+CapPhig(i-1)*phigprime(i-1))&
-            *abs(vg(-ngz)*dtau)
+            *abs(vpsig*dtau)
 !       write(*,'(a,i4,8f10.5)')'CapPhiStep',i,taug(i),zg(i),CapPhig(i),dForceg
     enddo
+    if(Wg.lt.0)then     ! Trapped orbit. Add resonant term. 
+       exptbb2=exp(sqm1*omegag*taug(ngz))
+! This form is to be divided by (1-exptb) full resonant denominator.
+! But it would probably be better to remove a (1.-exptbb2**2) factor and
+! Divide only the resonant term by (1.+exptbb2) later.
+       vpsig=abs(vg(0))
+       dForceg=dForceg*(1.-exptbb2**2) &
+            + sqm1*CapPhig(ngz)**2*(1.-exptbb2)*vpsig
+! In shiftmode the division by the resonant denominator is done
+! outside the routine because it involves complicated negotiation of
+! the resonance to preserve accuracy for trapped particles. 
+    endif
     write(*,'(a,8f10.5)')'Direct tau',taug(ngz),zg(ngz),dForceg,vg(-ngz)
   end subroutine Fdirect
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
