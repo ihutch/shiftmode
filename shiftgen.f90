@@ -38,7 +38,7 @@
 ! valley psi<0.
 
 module shiftgen
-  integer, parameter :: ngz=100,nge=100
+  integer, parameter :: ngz=100,nge=200
   real, dimension(-ngz:ngz) :: zg,vg,ones=1.,phig,phigprime,taug
   complex, dimension(-ngz:ngz) :: Lg,CapPhig
   complex :: omegag=(1.,0.),sqm1=(0.,1.),Ftot,dFordirect
@@ -48,6 +48,11 @@ module shiftgen
   real :: psig=.1,Wg,zm=10.,v0,z0,z1,z2,zR
   real :: vshift=0.,Tinf=1.
   integer :: ivs,iws
+  !Definitions from FtEintg moved to module declarations.
+  complex :: Fnonresg(0:nge),Ftrapg(0:nge),omegadg
+  complex :: Ftotalmode
+  integer :: iwpowg=2
+  real,parameter :: pig=3.1415926
 contains
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   subroutine makezg(isigma)
@@ -356,30 +361,22 @@ contains
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!  
   subroutine FtEintg(Ftotal,dfperpdWperp,fperp,isigma)
     use shiftmode    ! shows hack definition conflicts, and testing
+    logical :: lcompare=.false.  ! True Only if using shiftmode
     ! Integrate over fe (trapped). Wj=vpsi^2/2-psi. So vpsi=sqrt(2(psi+Wj))
     ! We must use cells that fill the Wj range 0 to -psi.
-    ! Derived from the shiftgen version
-    complex :: Ftotal,dFdvpsi,dFdvprev,exptb,exptbprev,cdvpsi,dob,dFdvpsig
-    real :: obi
-    ! Hacks to make compile should be moved to module declarations.
-    complex :: Fnonresg(0:nge),Ftrapg(0:nge),omegadg
-    integer :: iwpowg=2
-    real, dimension(0:nge) :: tbeg,xleng   ! Shiftmode parameters really
-    real,parameter :: pig=3.1415926
-    logical :: lcompare=.true.
+    complex :: Ftotal,dFdvpsi,exptb,exptbprev,cdvpsi,dob,dFdvpsig
+    real :: dfperpdWperp,fperp,obi
+    integer :: isigma
     
-    omegadg=omegag  ! More generally omegadg=omega-k*vy(i).
+    omegadg=omegag  ! More generally omegadg=omegag-k*vy(i).
     Ftotal=0.
     Wjprev=0.
-    if(lcompare)then ! Set some shiftmode values
-       psi=-psig                     ! psi is the positive depth
-       omega=omegag
-       omegad=omega
-    endif
+    Ftotalmode=0.
+! Zeroth step values. New exact analytic
     feprev=1/sqrt(2.*pig)
-    dfeprev=(15./(16.*sqrt(2.*psi))-1./sqrt(2.*pig))*fperp ! New exact analytic
+    dfeprev=(15./(16.*sqrt(-2.*psig))-1./sqrt(2.*pig))*fperp
     dfeperpprev=feprev*dfperpdWperp
-    vpsiprev=sqrt(2.*psi)
+    vpsiprev=sqrt(-2.*psig)
     omegabg(0)=0.
     Fnonresg(0)=0.                !Don't add zero energy point.
     exptbprev=0.                  !Silence warnings
@@ -388,26 +385,23 @@ contains
        Wj=Wgarray(i)
        ! New exact sech^4 hole form.
        sqWj=sqrt(-Wj)
-       fe=((2./pig)*sqWj+(15./16.)*Wj/sqrt(psi)+experfcc(sqWj)&
+       fe=((2./pig)*sqWj+(15./16.)*Wj/sqrt(-psig)+experfcc(sqWj)&
             /sqrt(pig))/sqrt(2.)
-       dfe=((15./16.)/sqrt(psi)-experfcc(sqWj)/sqrt(pig))/sqrt(2.)*fperp
+       dfe=((15./16.)/sqrt(-psig)-experfcc(sqWj)/sqrt(pig))/sqrt(2.)*fperp
        dfeperp=fe*dfperpdWperp      ! df/dW_perp
-       vpsi=sqrt(2.*(psi+Wj))
+       vpsi=sqrt(2.*(-psig+Wj))
+       vinfarrayr(i)=vpsi ! reflected==trapped for attracting hill.
        dvpsi=vpsiprev-vpsi
        ! calculate the force dFdvpsi for this vpsi and dvy element:
-       if(lcompare)call initialize
-       if(lcompare)call dFdvpsidvy(vpsi,dFdvpsi,tbeg(i),xleng(i))
        call Fdirect(Wgarray(i),isigma,dFdvpsig)
-
-       omegabg(i)=2.*pig/tbeg(i)
+       Forcegarray(i)=dFdvpsig
+       Forcegr(i)=Forcegarray(i)*omegag*dfe
+       omegabg(i)=2.*pig/(2.*taug(ngz))
        call pathshiftg(i,obi)
        omegabg(i)=omegabg(i)+sqm1*obi
        exptb=exp(sqm1*omegadg*2*pig/omegabg(i))
        if(.not.abs(exptb).lt.1.e10)exptb=1.e10  ! Enable divide by infinity
-       if(lcompare.and.i.eq.1)then
-          dFdvprev=dFdvpsi
-          exptbprev=exptb
-       endif
+       if(i.eq.1)exptbprev=exptb
        dob=omegabg(i)-omegabg(i-1)
        cdvpsi=dvpsi*(1.+sqm1*imag(dob)/real(dob))
        ! Strictly to get dFdvpsi we need to multiply by the omega f' terms
@@ -415,43 +409,62 @@ contains
        ! and correct for the imaginary shift of omegabg:
        Fnonresg(i)=Fnonresg(i)+sqm1*real(Fnonresg(i)-Fnonresg(i-1))  &
             /real(omegabg(i)-omegabg(i-1))*obi
-       if(tbeg(i)*imag(omegadg).lt.-4.)then ! Hack to fix giant dFdvpsi problem
-          write(*,*)'drop',tbeg(i),imag(omegadg),dFdvpsig
-          Fnonresg(i)=0.
+       if(taug(ngz)*imag(omegadg).lt.-2.)then!Hack fix giant dFdvpsi problem
+          write(*,*)'Drop',taug(ngz),imag(omegadg),dFdvpsig
+          Fnonresg(i)=0. 
        endif
        ! Then multiply by the resonance factor and the complex dvpsi and sum.
        Ftrapg(i)=0.5*(Fnonresg(i)/(1.-exptb) &
             +Fnonresg(i-1)/(1.-exptbprev))*cdvpsi
+    ! Now Ftrapg(i) is a quantity when simply summed over all ne positions
+    ! and multiplied by 2 gives the total force. 
        if(.not.(abs(Ftrapg(i)).ge.0))then
           write(*,*)'Ftrapg NAN?',i
           write(*,*)Fnonresg(i),Ftrapg(i)
           write(*,*)omegabg(i-1),omegabg(i)
           write(*,*)omegadg,omegadg/omegabg(i)
           write(*,*)exptb,exptbprev
+          write(*,*)dvpsi,vpsi,vpsiprev
           stop
        endif
-       Wgarrayr=Wgarray
        ! Multiply by 2. to account for \pm v_\psi.
        Ftotal=Ftotal+2.*Ftrapg(i)       ! Add to Ftotal integral.
-       if(.true.)then ! Document the comparison.
-          write(*,'(i3,'' shiftmode'',2f10.4,$)')i,Wj,tbeg(i)
+       if(lcompare)then ! Set some shiftmode values
+          psi=-psig                     ! psi is the positive depth
+          omega=omegag
+          omegad=omega
+          call initialize
+          call dFdvpsidvy(vpsi,dFdvpsi,tbi,xln)
+          Fnonres(i)=dFdvpsi*(omegadg*dfe-(omegadg-omegag)*dfeperp)
+          Fnonres(i)=Fnonres(i)+sqm1*real(Fnonres(i)-Fnonres(i-1))  &
+               /real(omegabg(i)-omegabg(i-1))*obi
+          Ftrap(i)=0.5*(Fnonres(i)/(1.-exptb) &
+               +Fnonres(i-1)/(1.-exptbprev))*cdvpsi
+          Ftotalmode=Ftotalmode+2.*Ftrap(i)       ! Add to Ftotal integral.
+          write(*,'(i3,'' shiftmode'',2f10.5,$)')i,tbi,real(Ftotalmode)
           write(*,*)dFdvpsi
-          write(*,'(i3,'' shiftgen '',2f10.4,$)')i,Wj,2.*taug(ngz)
+          write(*,'(i3,'' shiftgen '',2f10.5,$)')i,2.*taug(ngz),real(Ftotal)
           write(*,*)dFdvpsig
        endif
        vpsiprev=vpsi
        feprev=fe
-       dFdvprev=dFdvpsi
+!       dFdvprev=dFdvpsi
        dfeprev=dfe
        dfeperpprev=dfeperp
        exptbprev=exptb
     enddo
     ! Calculate end by extrapolation.
     Ftrapg(nge)=Ftrapg(nge-1)+0.5*(Ftrapg(nge-1)-Ftrapg(nge-2))
-    Ftotal=Ftotal+2.*Ftrapg(i)
     Fnonresg(nge)=Fnonresg(nge-1)
-    ! Now Ftrapg(i) is a quantity when simply summed over all ne positions
-    ! and multiplied by 2 gives the total force. 
+    Ftotal=Ftotal+2.*Ftrapg(nge)
+    Wgarray(nge)=psig
+    Wgarrayr=Wgarray
+    if(lcompare)then
+       call FtEint(Ftotalmode,dfperpdWperp,fperp)
+       write(*,*)'Fotalmode vs Ftotal (gen)'
+       write(*,*)Ftotalmode
+       write(*,*)Ftotal
+    endif
   end subroutine FtEintg
 !****************************************************************
 ! This is exp(X^2)*erfc(X)

@@ -143,23 +143,43 @@ end subroutine testFtEint
     use shiftgen
     complex :: Ftotalg
     character*40 annote
-    omegag=(.1,0.00000)
+    omegag=(2.,0.00000)
     psig=-.5
     isigma=-1    
     vshift=1.
-    if(psig.lt.0.)then
-       call FtEintg(Ftotalg,0.,1.,isigma)
-       write(*,*)'Return from FtEintg'
-       stop
-    else
-       call FgRepelEint(Ftotalg,isigma)
-    endif
     write(*,*)'Ftotalg=',Ftotalg
     write(annote,'(''!Ay!@='',f5.3,'' !Aw!@=('',f5.3'','',f5.3,'')'')')&
          psig,real(omegag),imag(omegag)
-!    call charsize(.018,.018)
     call dcharsize(.018,.018)
     call multiframe(2,1,2)
+    if(psig.lt.0.)then
+       call FtEintg(Ftotalg,0.,1.,isigma)
+       write(*,*)'Return from FtEintg. Ftotalg=',Ftotalg
+       call pltinit(vinfarrayr(nge),vinfarrayr(1),psig,-psig)
+       call axis
+       call axlabels('v!d!Ay!@!d','W')
+       call legendline(0.5,0.9,258,annote(1:lentrim(annote)))
+       call polymark(vinfarrayr,Wgarrayr,nge,1)
+       call polyline(vinfarrayr,Wgarrayr,nge)
+
+       call minmax(forcegp,2*nge,pmin,pmax)
+       call minmax(forcegr,2*nge,rmin,rmax)
+       call pltinit(vinfarrayr(nge),vinfarrayr(nge),min(pmin,rmin),max(pmax,rmax))
+       call axis
+       call axlabels('v!d!Ay!@!d','dF/dv!d!a;!@!d')
+       call color(1)
+       call polyline(vinfarrayr,real(forcegr),nge)
+!       call polyline(vinfarrayp,real(forcegp),nge)
+       call legendline(.6,.7,0,' real')
+       call color(2)
+       call polyline(vinfarrayr,imag(forcegr),nge)
+!    call polyline(vinfarrayp,imag(forcegp),nge)
+       call legendline(.6,.8,0,' imag')
+       call pltend
+       call multiframe(0,0,0)
+!       stop
+    else
+       call FgRepelEint(Ftotalg,isigma)
     call pltinit(vinfarrayr(nge),vinfarrayp(nge),0.,Wgarrayp(nge))
     call axis
     call axlabels('v!d!A;!@!d','W')
@@ -170,6 +190,7 @@ end subroutine testFtEint
     call polyline(vinfarrayr,Wgarrayr,nge)
     call polymark(vinfarrayr,Wgarrayr,nge,2)
     call polyline(vinfarrayp,tbp/10.,nge)
+    
     call polyline(vinfarrayr,tbr/10.,nge)
     call legendline(.2,.9,0,' t!dorbit!d/10')
 !    call pltend
@@ -192,6 +213,7 @@ end subroutine testFtEint
     call legendline(.6,.8,0,' imag')
     call pltend
     call multiframe(0,0,0)
+    endif
     call fvinfplot
   end subroutine testFrepel
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
