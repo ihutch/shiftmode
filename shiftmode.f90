@@ -96,7 +96,7 @@ contains
     complex :: exptau,Ltbb2,exptb,exptbb2,sumfactor,Ltfactor
     Wj=vpsi**2/2-psi
     if(Wj.gt.0)then
-       write(*,*)'Positive energy in trapped particle code'
+       write(*,*)'Positive energy in trapped particle code',vpsi,psi,Wj
        return
     endif
 
@@ -183,7 +183,6 @@ contains
        call pltinit(-12.,12.,-8.,8.)
        call axis()
     endif
-!    iwpow=2         ! Equal W spacing is ipow=1
     Ftotal=0.
     Wjprev=0.
     feprev=1/sqrt(2.*pi)
@@ -208,6 +207,7 @@ contains
        vpsi=sqrt(2.*(psi+Wj))
        dvpsi=vpsiprev-vpsi
        ! calculate the force dFdvpsi for this vpsi and dvy element:
+       call initialize
        call dFdvpsidvy(vpsi,dFdvpsi,tbe(i),xlen(i))
        if(.not.(abs(dFdvpsi).ge.0))then
           write(*,*)'dFdvpsi NaN?',dFdvpsi,Wj,vpsi,dvpsi

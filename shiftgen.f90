@@ -38,15 +38,15 @@
 ! valley psi<0.
 
 module shiftgen
-  integer, parameter :: ngz=200,nge=100
+  integer, parameter :: ngz=100,nge=100
   real, dimension(-ngz:ngz) :: zg,vg,ones=1.,phig,phigprime,taug
   complex, dimension(-ngz:ngz) :: Lg,CapPhig
   complex :: omegag=(1.,0.),sqm1=(0.,1.),Ftot,dFordirect
-  complex :: omegabg(nge),Forcegarray(nge),Forcegp(nge),Forcegr(nge)
+  complex :: omegabg(0:nge),Forcegarray(nge),Forcegp(nge),Forcegr(nge)
   real :: Wgarray(nge),Wgarrayp(nge),Wgarrayr(nge),vinfarrayp(nge)&
        &,vinfarrayr(nge),tbr(nge),tbp(nge)
   real :: psig=.1,Wg,zm=10.,v0,z0,z1,z2,zR
-  real :: vshift=0.,Tinf=1.,fvinf
+  real :: vshift=0.,Tinf=1.
   integer :: ivs,iws
 contains
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -56,8 +56,14 @@ contains
 ! orbit from z=isigma*zm (v sign -isigma) or trapped orbit from its
 ! isigma end.
     z0=0.
+    zmfac=1.
+! Make sure we don't miss a shallow trapped orbit
+1    if(Wg.lt.0..and.Wg.gt.phigofz(zmfac*isigma*zm))then
+       zmfac=1.2*zmfac
+       goto 1
+    endif
 ! Find any reflection position zR. ! Put equal to 0 if W>max(phi).
-    call orbitend(Wg,z0,isigma*zm)
+    call orbitendg(Wg,z0,zmfac*isigma*zm)
     zR=z0
     ivs=-1
     if(psig.gt.0)then ! Repelling potential
@@ -76,7 +82,6 @@ contains
        write(*,*)'ERROR psi is zero'
        stop
     endif
-!    if(Wg.eq.0)write(*,*)'ZeroWg',z1,z2,gK,zR
 !    write(*,*)'makezg: z1,z2,gK',z1,z2,gK
     do i=0,ngz
        zi=float(i)/ngz
@@ -97,7 +102,7 @@ contains
     enddo
   end subroutine makezg
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  subroutine orbitend(Wj,z0,zL)
+  subroutine orbitendg(Wj,z0,zL)
     ! Find by bisection the turning point if any of the orbit whose
     ! energy is Wj lying between zL (normally negative) and z0 (=0).  
     ! That is where phi=-Wj, return z0 s.t. |z0| is just lower.
@@ -127,7 +132,7 @@ contains
           z1=zm
        endif
     enddo
-  end subroutine orbitend
+  end subroutine orbitendg
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 ! If some different form of phi is required. Replace these functions,
 ! e.g. with forms that call functions outside the module. 
@@ -253,6 +258,8 @@ contains
 !    if(psig.le.0)return ! When restricted to repelling hills. 
     Wg=Wgi
     call makezg(isigma) ! Sets various time array values.
+!    write(*,*)'Wg=',Wg,' psig=',psig,' isigma=',isigma
+!    write(*,'(10f8.4)')vg,zg
     vpsig=vg(-ngz)            ! Untrapped default ...
     if(Wg.lt.0.)vpsig=vg(0)   ! Trapped particle f(v) reference.
     ips=int(sign(1.,psig))
@@ -260,6 +267,7 @@ contains
     taug(-ngz)=0.
     CapPhig(-ngz)=0.
     dForceg=0.
+    if(Wg.lt.phigofz(zm).and.psig.gt.0)return  ! Reflected Energy too small
     do i=-ngz+1,ngz
        phigp=0.5*(phigprime(i)+phigprime(i-1))
        vmean=0.5*(vg(i)+vg(i-1))
@@ -270,6 +278,10 @@ contains
        else                               ! Use dtau=dx*dtau/dx
           dtau=((zg(i)-zg(i-1))*vmean/(vg(i-1)*vg(i)))
           if(ips.le.0..or.zR.eq.0)iws=i   ! Attracted or unreflected
+       endif
+       if(.not.dtau.lt.1e6)then
+          write(*,*)i,'dtau=',dtau,v0,vg(i-1),vg(i),zR,Wg,vpsig,phigp
+          stop
        endif
        taug(i)=taug(i-1)+dtau
        CPfactor=exp(sqm1*omegag*dtau) ! Current exponential
@@ -291,7 +303,7 @@ contains
 ! outside the routine because it involves complicated negotiation of
 ! the resonance to preserve accuracy for trapped particles. 
     endif
-    write(*,'(a,8f10.5)')'Direct tau',taug(ngz),zg(ngz),dForceg,vg(-ngz)
+!    write(*,'(a,8f10.5)')'Direct tau',taug(ngz),zg(ngz),dForceg,vg(-ngz)
   end subroutine Fdirect
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   subroutine FgRepelEint(Ftotalg,isigma)
@@ -301,48 +313,162 @@ contains
 ! For symmetric potentials and f(v), the returned Ftotalg can simply be
 ! doubled to give the total force since then it is symmetric in isigma.
     complex Ftotalg,Ftotalpg,Ftotalrg
-    Emaxg=5.
+    Emaxg=4.*Tinf+vshift**2
     do i=1,nge  ! Passing
        Wgarray(i)=psig+Emaxg*(i/float(nge))**2
        vinfarrayp(i)=-isigma*sqrt(2.*Wgarray(i))
-       call LofW(Wgarray(i),isigma,Forcegarray(i))
+!       call LofW(Wgarray(i),isigma,Forcegarray(i))
+       call Fdirect(Wgarray(i),isigma,Forcegarray(i))
        if(i.eq.1)then  ! Start of integration
           dvinf=abs(vinfarrayp(i))-sqrt(2.*psig)
-          Ftotalpg=Forcegarray(i)*dfdWpar(vinfarrayp(i))&
+          Ftotalpg=Forcegarray(i)*dfdWpar(vinfarrayp(i),fvinf)&
                &*dvinf*omegag
        else
           dvinf=abs(vinfarrayp(i)-vinfarrayp(i-1))
-          Ftotalpg=Ftotalpg+0.5*(Forcegarray(i)*dfdWpar(vinfarrayp(i)) &
-               +Forcegarray(i-1)*dfdWpar(vinfarrayp(i-1)))*dvinf*omegag
+          Ftotalpg=Ftotalpg+0.5*(Forcegarray(i)*dfdWpar(vinfarrayp(i),fvinf) &
+               +Forcegarray(i-1)*dfdWpar(vinfarrayp(i-1),fvinf))*dvinf*omegag
        endif
-       Forcegp(i)=Forcegarray(i)*omegag*dfdWpar(vinfarrayp(i))
+       Forcegp(i)=Forcegarray(i)*omegag*dfdWpar(vinfarrayp(i),fvinf)
        tbp(i)=taug(ngz)
     enddo
     Wgarrayp=Wgarray
     do i=1,nge  ! Reflected
        Wgarray(i)=psig*(1.-(i/float(nge))**2)
        vinfarrayr(i)=-isigma*sqrt(2.*Wgarray(i))
-       call LofW(Wgarray(i),isigma,Forcegarray(i))
+!       call LofW(Wgarray(i),isigma,Forcegarray(i))
+       call Fdirect(Wgarray(i),isigma,Forcegarray(i))
        if(i.eq.1)then
           dvinf=abs(vinfarrayr(i))-sqrt(2.*psig)
-          Ftotalrg=Forcegarray(i)*dvinf*dfdWpar(vinfarrayr(i))*omegag
+          Ftotalrg=Forcegarray(i)*dvinf*dfdWpar(vinfarrayr(i),fvinf)*omegag
        else
           dvinf=abs(vinfarrayr(i)-vinfarrayr(i-1))
-          Ftotalrg=Ftotalrg+0.5*(Forcegarray(i)*dfdWpar(vinfarrayr(i)) &
-               +Forcegarray(i-1)*dfdWpar(vinfarrayr(i-1)))*dvinf*omegag
+          Ftotalrg=Ftotalrg+0.5*(Forcegarray(i)*dfdWpar(vinfarrayr(i),fvinf) &
+               +Forcegarray(i-1)*dfdWpar(vinfarrayr(i-1),fvinf))*dvinf*omegag
        endif
-       Forcegr(i)=Forcegarray(i)*omegag*dfdWpar(vinfarrayr(i))
+       Forcegr(i)=Forcegarray(i)*omegag*dfdWpar(vinfarrayr(i),fvinf)
        tbr(i)=taug(ngz)
     enddo
 !    write(*,'(i3,6f10.4)')50,vinfarrayr(50),Forcegarray(50),Forcegr(50)&
-!         ,dfdWpar(vinfarrayr(50))
+!         ,dfdWpar(vinfarrayr(50),fvinv)
     Wgarrayr=Wgarray
     Ftotalg=Ftotalpg+Ftotalrg
   end subroutine FgRepelEint
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!  
+  subroutine FtEintg(Ftotal,dfperpdWperp,fperp,isigma)
+    use shiftmode    ! shows hack definition conflicts, and testing
+    ! Integrate over fe (trapped). Wj=vpsi^2/2-psi. So vpsi=sqrt(2(psi+Wj))
+    ! We must use cells that fill the Wj range 0 to -psi.
+    ! Derived from the shiftgen version
+    complex :: Ftotal,dFdvpsi,dFdvprev,exptb,exptbprev,cdvpsi,dob,dFdvpsig
+    real :: obi
+    ! Hacks to make compile should be moved to module declarations.
+    complex :: Fnonresg(0:nge),Ftrapg(0:nge),omegadg
+    integer :: iwpowg=2
+    real, dimension(0:nge) :: tbeg,xleng   ! Shiftmode parameters really
+    real,parameter :: pig=3.1415926
+    logical :: lcompare=.true.
+    
+    omegadg=omegag  ! More generally omegadg=omega-k*vy(i).
+    Ftotal=0.
+    Wjprev=0.
+    if(lcompare)then ! Set some shiftmode values
+       psi=-psig                     ! psi is the positive depth
+       omega=omegag
+       omegad=omega
+    endif
+    feprev=1/sqrt(2.*pig)
+    dfeprev=(15./(16.*sqrt(2.*psi))-1./sqrt(2.*pig))*fperp ! New exact analytic
+    dfeperpprev=feprev*dfperpdWperp
+    vpsiprev=sqrt(2.*psi)
+    omegabg(0)=0.
+    Fnonresg(0)=0.                !Don't add zero energy point.
+    exptbprev=0.                  !Silence warnings
+    do i=1,nge-1
+       Wgarray(i)=psig*((float(i)/nge)**iwpowg)
+       Wj=Wgarray(i)
+       ! New exact sech^4 hole form.
+       sqWj=sqrt(-Wj)
+       fe=((2./pig)*sqWj+(15./16.)*Wj/sqrt(psi)+experfcc(sqWj)&
+            /sqrt(pig))/sqrt(2.)
+       dfe=((15./16.)/sqrt(psi)-experfcc(sqWj)/sqrt(pig))/sqrt(2.)*fperp
+       dfeperp=fe*dfperpdWperp      ! df/dW_perp
+       vpsi=sqrt(2.*(psi+Wj))
+       dvpsi=vpsiprev-vpsi
+       ! calculate the force dFdvpsi for this vpsi and dvy element:
+       if(lcompare)call initialize
+       if(lcompare)call dFdvpsidvy(vpsi,dFdvpsi,tbeg(i),xleng(i))
+       call Fdirect(Wgarray(i),isigma,dFdvpsig)
+
+       omegabg(i)=2.*pig/tbeg(i)
+       call pathshiftg(i,obi)
+       omegabg(i)=omegabg(i)+sqm1*obi
+       exptb=exp(sqm1*omegadg*2*pig/omegabg(i))
+       if(.not.abs(exptb).lt.1.e10)exptb=1.e10  ! Enable divide by infinity
+       if(lcompare.and.i.eq.1)then
+          dFdvprev=dFdvpsi
+          exptbprev=exptb
+       endif
+       dob=omegabg(i)-omegabg(i-1)
+       cdvpsi=dvpsi*(1.+sqm1*imag(dob)/real(dob))
+       ! Strictly to get dFdvpsi we need to multiply by the omega f' terms
+       Fnonresg(i)=dFdvpsig*(omegadg*dfe-(omegadg-omegag)*dfeperp)
+       ! and correct for the imaginary shift of omegabg:
+       Fnonresg(i)=Fnonresg(i)+sqm1*real(Fnonresg(i)-Fnonresg(i-1))  &
+            /real(omegabg(i)-omegabg(i-1))*obi
+       if(tbeg(i)*imag(omegadg).lt.-4.)then ! Hack to fix giant dFdvpsi problem
+          write(*,*)'drop',tbeg(i),imag(omegadg),dFdvpsig
+          Fnonresg(i)=0.
+       endif
+       ! Then multiply by the resonance factor and the complex dvpsi and sum.
+       Ftrapg(i)=0.5*(Fnonresg(i)/(1.-exptb) &
+            +Fnonresg(i-1)/(1.-exptbprev))*cdvpsi
+       if(.not.(abs(Ftrapg(i)).ge.0))then
+          write(*,*)'Ftrapg NAN?',i
+          write(*,*)Fnonresg(i),Ftrapg(i)
+          write(*,*)omegabg(i-1),omegabg(i)
+          write(*,*)omegadg,omegadg/omegabg(i)
+          write(*,*)exptb,exptbprev
+          stop
+       endif
+       Wgarrayr=Wgarray
+       ! Multiply by 2. to account for \pm v_\psi.
+       Ftotal=Ftotal+2.*Ftrapg(i)       ! Add to Ftotal integral.
+       if(.true.)then ! Document the comparison.
+          write(*,'(i3,'' shiftmode'',2f10.4,$)')i,Wj,tbeg(i)
+          write(*,*)dFdvpsi
+          write(*,'(i3,'' shiftgen '',2f10.4,$)')i,Wj,2.*taug(ngz)
+          write(*,*)dFdvpsig
+       endif
+       vpsiprev=vpsi
+       feprev=fe
+       dFdvprev=dFdvpsi
+       dfeprev=dfe
+       dfeperpprev=dfeperp
+       exptbprev=exptb
+    enddo
+    ! Calculate end by extrapolation.
+    Ftrapg(nge)=Ftrapg(nge-1)+0.5*(Ftrapg(nge-1)-Ftrapg(nge-2))
+    Ftotal=Ftotal+2.*Ftrapg(i)
+    Fnonresg(nge)=Fnonresg(nge-1)
+    ! Now Ftrapg(i) is a quantity when simply summed over all ne positions
+    ! and multiplied by 2 gives the total force. 
+  end subroutine FtEintg
+!****************************************************************
+! This is exp(X^2)*erfc(X)
+      FUNCTION expERFCC(X)
+      Z=ABS(X)      
+      T=1./(1.+0.5*Z)
+      expERFCC=T*EXP(-1.26551223+T*(1.00002368+T*(.37409196+             &
+     &    T*(.09678418+T*(-.18628806+T*(.27886807+T*(-1.13520398+        &
+     &    T*(1.48851587+T*(-.82215223+T*.17087277)))))))))
+      IF (X.LT.0.) expERFCC=2.*exp(z**2)-expERFCC
+      END
+!********************************************************************
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  real function dfdWpar(vinf)
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  real function dfdWpar(vinf,fvinf)
 ! The derivative of the distant distribution func wrt energy W at 
-! velocity vinf, in the rest frame of the hole. 
+! velocity vinf, in the rest frame of the hole. fvinf is returned the f(v). 
 ! Example. Maxwellian of temperature T. f=exp(-vinv^2/2T)/sqrt(2 pi T)
 !    dfdWpar=-exp(-vinf**2/(2.*Tinf))/Tinf/sqrt(2.*3.1415926*Tinf)
 ! Two half-density Maxwellians symmetrically shifted by vshift
@@ -352,18 +478,20 @@ contains
     fvinf=0.5*(e1+e2)/sqrt(2.*3.1415926*Tinf)
     dfdWpar=0.5*(-e1*(vinf-vshift)-e2*(vinf+vshift)) &
          &/sign(max(abs(vinf*Tinf),1.e-6),vinf)/sqrt(2.*3.1415926*Tinf)
-
-  end function dfdwpar
+  end function dfdWpar
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   subroutine fvinfplot
-! Do not call if vinfarray is already in use!
+! vshift, Tinf, defined in module shiftgen,     
+    integer, parameter :: ngpl=100
+    real, dimension(ngpl) :: vplinf,fplinf
     character*10 string
-    do i=1,nge
-       vinfarrayp(i)=-zm+2.*i/zm
-       blah=dfdWpar(vinfarrayp(i))
-       vinfarrayr(i)=fvinf   ! This is really f, not v.
+    vpmax=4.*sqrt(Tinf)+vshift
+    do i=1,ngpl
+       vplinf(i)=-vpmax+2.*i/ngpl*vpmax
+       blah=dfdWpar(vplinf(i),fvinf)
+       fplinf(i)=fvinf   ! This is really f, not v.
     enddo
-    call autoplot(vinfarrayp,vinfarrayr,nge)
+    call autoplot(vplinf,fplinf,ngpl)
     call axlabels('v','f!di!A;!@!d')
     call fwrite(vshift,iwidth,2,string)
     call legendline(0.1,0.9,258,'v!ds!d='//string(1:iwidth))
@@ -372,7 +500,7 @@ contains
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   subroutine pathshiftg(i,obi)
-! Calculate the required shift of the omegab path below the real axis
+! Calculate the required shift of the omegabg path below the real axis
 ! for this ith energy mesh value, assuming the previous omegabg(i-1)
 ! is known.
     real :: obi
