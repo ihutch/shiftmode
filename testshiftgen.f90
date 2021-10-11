@@ -147,7 +147,6 @@ end subroutine testFtEint
     psig=.5
     isigma=-1    
     vshift=1.
-    write(*,*)'Ftotalg=',Ftotalg
     write(annote,'(''!Ay!@='',f5.3,'' !Aw!@=('',f5.3'','',f5.3,'')'')')&
          psig,real(omegag),imag(omegag)
     call dcharsize(.018,.018)
@@ -191,43 +190,64 @@ end subroutine testFtEint
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   subroutine testAttract
     use shiftgen
+    use shiftmode
+    real, dimension(nge) :: vpsiarrayp
     complex :: Ftotalg
     character*40 annote
     omegag=(.1,0.00000)
     psig=-.5
     isigma=-1    
-    vshift=1.
-    write(*,*)'Ftotalg=',Ftotalg
+    vshift=0.
     write(annote,'(''!Ay!@='',f5.3,'' !Aw!@=('',f5.3'','',f5.3,'')'')')&
          psig,real(omegag),imag(omegag)
     call dcharsize(.018,.018)
     call multiframe(2,1,2)
-       call FtEintg(Ftotalg,0.,1.,isigma)
-       write(*,*)'Return from FtEintg. Ftotalg=',Ftotalg
-       call pltinit(vinfarrayr(nge),vinfarrayr(1),psig,-psig)
-       call axis
-       call axlabels('v!d!Ay!@!d','W')
-       call legendline(0.5,0.9,258,annote(1:lentrim(annote)))
-       call polymark(vinfarrayr,Wgarrayr,nge,1)
-       call polyline(vinfarrayr,Wgarrayr,nge)
-
-       call minmax(forcegp,2*nge,pmin,pmax)
-       call minmax(forcegr,2*nge,rmin,rmax)
-       call pltinit(vinfarrayr(nge),vinfarrayr(nge),min(pmin,rmin),max(pmax,rmax))
-       call axis
-       call axlabels('v!d!Ay!@!d','dF/dv!d!a;!@!d')
-       call color(1)
-       call polyline(vinfarrayr,real(forcegr),nge)
-!       call polyline(vinfarrayp,real(forcegp),nge)
-       call legendline(.6,.7,0,' real')
-       call color(2)
-       call polyline(vinfarrayr,imag(forcegr),nge)
-!    call polyline(vinfarrayp,imag(forcegp),nge)
-       call legendline(.6,.8,0,' imag')
-       call pltend
-       call multiframe(0,0,0)
+    call FgAttractEint(Ftotalg,isigma)
+!    write(*,*)'Return from FgAttractEint. Ftotalg=',Ftotalg
+    vpsiarrayp=sqrt(2.*(Wgarrayp(1:nge)-psig))
+!    call pltinit(vinfarrayr(nge),vinfarrayp(nge),psig,Wgarrayp(nge))
+    call pltinit(vinfarrayr(nge),vpsiarrayp(nge),psig,Wgarrayp(nge))
+    call axis
+    call axlabels('v!d!Ay!@!d','W')
+    call legendline(0.5,0.9,258,annote(1:lentrim(annote)))
+    call polymark(vinfarrayr,Wgarrayr,nge,1)
+    call polyline(vinfarrayr,Wgarrayr,nge)
+    call polyline(vpsiarrayp,Wgarrayp,nge)
+    
+    call minmax(forcegp,2*nge,pmin,pmax)
+    call minmax(forcegr,2*nge,rmin,rmax)
+!    write(*,*)'pmin,pmax,rmin,rmax',pmin,pmax,rmin,rmax
+    call pltinit(vinfarrayr(nge),vpsiarrayp(nge),min(pmin,rmin),max(pmax,rmax))
+    call axis
+    call axlabels('v!d!Ay!@!d','dF/dv!d!a;!@!d')
+    call color(1)
+    call polyline(vinfarrayr,real(forcegr),nge)
+    call legendline(.6,.7,0,' real trapped')
+    call color(2)
+    call polyline(vinfarrayr,imag(forcegr),nge)
+    call legendline(.6,.8,0,' imag trapped')
+    call color(3)
+    call polyline(vpsiarrayp,10.*imag(forcegp),nge)
+    call legendline(.6,.6,0,' 10xreal passing')
+    call color(4)
+    call polyline(vpsiarrayp,10.*real(forcegp),nge)
+    call legendline(.6,.5,0,' 10ximag passing')
+    call pltend
+    call multiframe(0,0,0)
 !       stop
     call fvinfplot
+    psi=-psig                     ! psi is the positive depth
+    omega=omegag
+    omegad=omega
+    omegac=10.
+    call initialize
+    call SumHarmonics
+    write(*,*)'Ftraptotal mode',Ftraptotal
+    write(*,*)'Ftraptotal gen ',Ftotalrg
+    write(*,*)'Fpasstotal mode',Fpasstotal
+    write(*,*)'Fpasstotal gen ',Ftotalpg
+    write(*,*)'Sum mode       ',Ftraptotal+Fpasstotal
+    write(*,*)'Sum gen        ',Ftotalrg+Ftotalpg
   end subroutine testAttract
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   subroutine Frepelofomega

@@ -44,13 +44,14 @@ module shiftgen
   complex :: omegag=(1.,0.),sqm1=(0.,1.),Ftot,dFordirect
   complex :: omegabg(0:nge),Forcegarray(nge),Forcegp(nge),Forcegr(nge)
   real :: Wgarray(nge),Wgarrayp(nge),Wgarrayr(nge),vinfarrayp(nge)&
-       &,vinfarrayr(nge),tbr(nge),tbp(nge)
+       &,vinfarrayr(nge),tbr(nge),tbp(nge),Wgarrayu(nge)
   real :: psig=.1,Wg,zm=10.,v0,z0,z1,z2,zR
   real :: vshift=0.,Tinf=1.
   integer :: ivs,iws
-  !Definitions from FtEintg moved to module declarations.
+  !Definitions from FgTrappedEint moved to module declarations.
   complex :: Fnonresg(0:nge),Ftrapg(0:nge),omegadg
   complex :: Ftotalmode
+  complex :: Ftotalrg,Ftotalpg
   integer :: iwpowg=2
   real,parameter :: pig=3.1415926
 contains
@@ -311,32 +312,61 @@ contains
 !    write(*,'(a,8f10.5)')'Direct tau',taug(ngz),zg(ngz),dForceg,vg(-ngz)
   end subroutine Fdirect
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!  
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!  
   subroutine FgRepelEint(Ftotalg,isigma)
 ! Integrate the force over energy to obtain the full parallel distribution
 ! This version ignores possible dependence on v-perp (for now). 
 ! Just for positive (repelling) psig. isigma is the entering z-sign.
 ! For symmetric potentials and f(v), the returned Ftotalg can simply be
 ! doubled to give the total force since then it is symmetric in isigma.
-    complex Ftotalg,Ftotalpg,Ftotalrg
+    complex Ftotalg
     Emaxg=4.*Tinf+vshift**2
-    do i=1,nge  ! Passing
-       Wgarray(i)=psig+Emaxg*(i/float(nge))**2
+    call FgPassingEint(Ftotalpg,isigma,Emaxg)
+    write(*,*)'Repelling Ftotalpg',Ftotalpg
+    call FgReflectedEint(Ftotalrg,isigma)
+!    write(*,'(i3,6f10.4)')50,vinfarrayr(50),Forcegarray(50),Forcegr(50)&
+!         ,dfdWpar(vinfarrayr(50),fvinv)
+    Ftotalg=Ftotalpg+Ftotalrg
+  end subroutine FgRepelEint
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  subroutine FgPassingEint(Ftp,isigma,Emaxg)
+    use shiftmode
+    complex Ftp
+    logical :: lcompare=.false.
+    complex passforce
+    do i=1,nge  ! Passing, corrected for psig sign.
+       Wgarray(i)=max(psig,0.)+Emaxg*(i/float(nge))**2
        vinfarrayp(i)=-isigma*sqrt(2.*Wgarray(i))
+!       write(*,*)'Wgarray(i),vinfarrayp(i)',Wgarray(i),vinfarrayp(i)
 !       call LofW(Wgarray(i),isigma,Forcegarray(i))
        call Fdirect(Wgarray(i),isigma,Forcegarray(i))
        if(i.eq.1)then  ! Start of integration
-          dvinf=abs(vinfarrayp(i))-sqrt(2.*psig)
-          Ftotalpg=Forcegarray(i)*dfdWpar(vinfarrayp(i),fvinf)&
+          dvinf=abs(vinfarrayp(i))
+          Ftp=Forcegarray(i)*dfdWpar(vinfarrayp(i),fvinf)&
                &*dvinf*omegag
        else
           dvinf=abs(vinfarrayp(i)-vinfarrayp(i-1))
-          Ftotalpg=Ftotalpg+0.5*(Forcegarray(i)*dfdWpar(vinfarrayp(i),fvinf) &
+          Ftp=Ftp+0.5*(Forcegarray(i)*dfdWpar(vinfarrayp(i),fvinf) &
                +Forcegarray(i-1)*dfdWpar(vinfarrayp(i-1),fvinf))*dvinf*omegag
        endif
        Forcegp(i)=Forcegarray(i)*omegag*dfdWpar(vinfarrayp(i),fvinf)
        tbp(i)=taug(ngz)
+       if(lcompare)then
+          psi=-psig                     ! psi is the positive depth
+          omega=omegag
+          omegad=omega
+          call initialize
+          call dFdvinfdvy(vinfarrayp(i),passforce)
+          write(*,'(i3,'' shiftmode passing'',f8.4,2e12.5)')i,psig,passforce
+          write(*,'(i3,'' shiftgen  passing'',f8.4,2e12.5)')i,psig,Forcegarray(i)
+       endif
     enddo
     Wgarrayp=Wgarray
+  end subroutine FgPassingEint
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!  
+  subroutine FgReflectedEint(Ftr,isigma)
+    complex Ftr
     do i=1,nge  ! Reflected
        Wgarray(i)=psig*(1.-(i/float(nge))**2)
        vinfarrayr(i)=-isigma*sqrt(2.*Wgarray(i))
@@ -344,24 +374,33 @@ contains
        call Fdirect(Wgarray(i),isigma,Forcegarray(i))
        if(i.eq.1)then
           dvinf=abs(vinfarrayr(i))-sqrt(2.*psig)
-          Ftotalrg=Forcegarray(i)*dvinf*dfdWpar(vinfarrayr(i),fvinf)*omegag
+          Ftr=Forcegarray(i)*dvinf*dfdWpar(vinfarrayr(i),fvinf)*omegag
        else
           dvinf=abs(vinfarrayr(i)-vinfarrayr(i-1))
-          Ftotalrg=Ftotalrg+0.5*(Forcegarray(i)*dfdWpar(vinfarrayr(i),fvinf) &
-               +Forcegarray(i-1)*dfdWpar(vinfarrayr(i-1),fvinf))*dvinf*omegag
+          Ftr=Ftr+0.5*(Forcegarray(i) &
+               &*dfdWpar(vinfarrayr(i),fvinf) +Forcegarray(i-1) &
+               &*dfdWpar(vinfarrayr(i-1),fvinf))*dvinf*omegag
        endif
        Forcegr(i)=Forcegarray(i)*omegag*dfdWpar(vinfarrayr(i),fvinf)
        tbr(i)=taug(ngz)
     enddo
-!    write(*,'(i3,6f10.4)')50,vinfarrayr(50),Forcegarray(50),Forcegr(50)&
-!         ,dfdWpar(vinfarrayr(50),fvinv)
     Wgarrayr=Wgarray
-    Ftotalg=Ftotalpg+Ftotalrg
-  end subroutine FgRepelEint
+  end subroutine FgReflectedEint
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!  
-  subroutine FtEintg(Ftotal,dfperpdWperp,fperp,isigma)
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!  
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!  
+  subroutine FgAttractEint(Ftotalg,isigma)
+    complex Ftotalg
+    Emaxg=4.*Tinf+vshift**2
+    call FgPassingEint(Ftotalpg,isigma,Emaxg)
+    call FgTrappedEint(Ftotalrg,0.,1.,isigma) ! Hacked dfperp
+    Ftotalpg=2.*Ftotalpg ! Because both passing v-directions not yet done.
+    Ftotalg=Ftotalpg+Ftotalrg
+  end subroutine FgAttractEint
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!  
+  subroutine FgTrappedEint(Ftotal,dfperpdWperp,fperp,isigma)
     use shiftmode    ! shows hack definition conflicts, and testing
-    logical :: lcompare=.false.  ! True Only if using shiftmode
+    logical :: lcompare=.false.  ! Make True Only if using shiftmode
     ! Integrate over fe (trapped). Wj=vpsi^2/2-psi. So vpsi=sqrt(2(psi+Wj))
     ! We must use cells that fill the Wj range 0 to -psi.
     complex :: Ftotal,dFdvpsi,exptb,exptbprev,cdvpsi,dob,dFdvpsig
@@ -380,7 +419,7 @@ contains
     omegabg(0)=0.
     Fnonresg(0)=0.                !Don't add zero energy point.
     exptbprev=0.                  !Silence warnings
-    do i=1,nge-1
+    do i=1,nge-1       ! Trapped
        Wgarray(i)=psig*((float(i)/nge)**iwpowg)
        Wj=Wgarray(i)
        ! New exact sech^4 hole form.
@@ -459,13 +498,13 @@ contains
     Ftotal=Ftotal+2.*Ftrapg(nge)
     Wgarray(nge)=psig
     Wgarrayr=Wgarray
-    if(lcompare)then
+    if(lcompare)then  ! Get the shiftmode Ftotal.
        call FtEint(Ftotalmode,dfperpdWperp,fperp)
        write(*,*)'Fotalmode vs Ftotal (gen)'
        write(*,*)Ftotalmode
        write(*,*)Ftotal
     endif
-  end subroutine FtEintg
+  end subroutine FgTrappedEint
 !****************************************************************
 ! This is exp(X^2)*erfc(X)
       FUNCTION expERFCC(X)
