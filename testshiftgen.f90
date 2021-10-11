@@ -143,7 +143,57 @@ end subroutine testFtEint
     use shiftgen
     complex :: Ftotalg
     character*40 annote
-    omegag=(2.,0.00000)
+    omegag=(.1,0.00000)
+    psig=.5
+    isigma=-1    
+    vshift=1.
+    write(*,*)'Ftotalg=',Ftotalg
+    write(annote,'(''!Ay!@='',f5.3,'' !Aw!@=('',f5.3'','',f5.3,'')'')')&
+         psig,real(omegag),imag(omegag)
+    call dcharsize(.018,.018)
+    call multiframe(2,1,2)
+       call FgRepelEint(Ftotalg,isigma)
+       call pltinit(vinfarrayr(nge),vinfarrayp(nge),0.,Wgarrayp(nge))
+       call axis
+       call axlabels('v!d!A;!@!d','W')
+       call legendline(0.5,0.9,258,annote(1:lentrim(annote)))
+       call winset(.true.)
+       call polymark(vinfarrayp,Wgarrayp,nge,1)
+       call polyline(vinfarrayp,Wgarrayp,nge)
+       call polyline(vinfarrayr,Wgarrayr,nge)
+       call polymark(vinfarrayr,Wgarrayr,nge,2)
+       call polyline(vinfarrayp,tbp/10.,nge)
+       
+       call polyline(vinfarrayr,tbr/10.,nge)
+       call legendline(.2,.9,0,' t!dorbit!d/10')
+!    call pltend
+       call minmax(forcegp,2*nge,pmin,pmax)
+       call minmax(forcegr,2*nge,rmin,rmax)
+       call pltinit(vinfarrayr(nge),vinfarrayp(nge),min(pmin,rmin),max(pmax,rmax))
+       call axis
+       call axlabels('v!d!A;!@!d','dF/dv!d!a;!@!d')
+       call color(1)
+       call polyline(vinfarrayr,real(forcegr),nge)
+       call polyline(vinfarrayp,real(forcegp),nge)
+!    call polymark(vinfarrayr,real(forcegr),nge,1)
+!    call polymark(vinfarrayp,real(forcegp),nge,1)
+       call legendline(.6,.7,0,' real')
+       call color(2)
+       call polyline(vinfarrayr,imag(forcegr),nge)
+       call polyline(vinfarrayp,imag(forcegp),nge)
+!    call polymark(vinfarrayr,imag(forcegr),nge,2)
+!    call polymark(vinfarrayp,imag(forcegp),nge,2)
+       call legendline(.6,.8,0,' imag')
+       call pltend
+       call multiframe(0,0,0)
+    call fvinfplot
+  end subroutine testFrepel
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  subroutine testAttract
+    use shiftgen
+    complex :: Ftotalg
+    character*40 annote
+    omegag=(.1,0.00000)
     psig=-.5
     isigma=-1    
     vshift=1.
@@ -152,7 +202,6 @@ end subroutine testFtEint
          psig,real(omegag),imag(omegag)
     call dcharsize(.018,.018)
     call multiframe(2,1,2)
-    if(psig.lt.0.)then
        call FtEintg(Ftotalg,0.,1.,isigma)
        write(*,*)'Return from FtEintg. Ftotalg=',Ftotalg
        call pltinit(vinfarrayr(nge),vinfarrayr(1),psig,-psig)
@@ -178,44 +227,8 @@ end subroutine testFtEint
        call pltend
        call multiframe(0,0,0)
 !       stop
-    else
-       call FgRepelEint(Ftotalg,isigma)
-    call pltinit(vinfarrayr(nge),vinfarrayp(nge),0.,Wgarrayp(nge))
-    call axis
-    call axlabels('v!d!A;!@!d','W')
-    call legendline(0.5,0.9,258,annote(1:lentrim(annote)))
-    call winset(.true.)
-    call polymark(vinfarrayp,Wgarrayp,nge,1)
-    call polyline(vinfarrayp,Wgarrayp,nge)
-    call polyline(vinfarrayr,Wgarrayr,nge)
-    call polymark(vinfarrayr,Wgarrayr,nge,2)
-    call polyline(vinfarrayp,tbp/10.,nge)
-    
-    call polyline(vinfarrayr,tbr/10.,nge)
-    call legendline(.2,.9,0,' t!dorbit!d/10')
-!    call pltend
-    call minmax(forcegp,2*nge,pmin,pmax)
-    call minmax(forcegr,2*nge,rmin,rmax)
-    call pltinit(vinfarrayr(nge),vinfarrayp(nge),min(pmin,rmin),max(pmax,rmax))
-    call axis
-    call axlabels('v!d!A;!@!d','dF/dv!d!a;!@!d')
-    call color(1)
-    call polyline(vinfarrayr,real(forcegr),nge)
-    call polyline(vinfarrayp,real(forcegp),nge)
-!    call polymark(vinfarrayr,real(forcegr),nge,1)
-!    call polymark(vinfarrayp,real(forcegp),nge,1)
-    call legendline(.6,.7,0,' real')
-    call color(2)
-    call polyline(vinfarrayr,imag(forcegr),nge)
-    call polyline(vinfarrayp,imag(forcegp),nge)
-!    call polymark(vinfarrayr,imag(forcegr),nge,2)
-!    call polymark(vinfarrayp,imag(forcegp),nge,2)
-    call legendline(.6,.8,0,' imag')
-    call pltend
-    call multiframe(0,0,0)
-    endif
     call fvinfplot
-  end subroutine testFrepel
+  end subroutine testAttract
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   subroutine Frepelofomega
     use shiftgen
@@ -290,5 +303,6 @@ end subroutine testFtEint
        
 !  call testLofW
   call testFrepel
+  call testAttract
 !  call Frepelofomega
 end program
