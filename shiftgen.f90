@@ -150,7 +150,7 @@ contains
     phigprimeofz=-psig*sinh(zval/4.)/cosh(zval/4.)**5
   end function phigprimeofz
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  subroutine LofW(Wgi,isigma,dForceg)
+  subroutine LofW(Wgi,isigma,dForceg) !Obsolete.
   ! Calculate the past integral of tau and Lg(tau)
   ! vs z for orbit of energy W, starting at isigma side. Where
   ! Lg= \int_{-\infty}^{t} (v-v_0)*exp(-i*omegag(tau-t)dtau.
@@ -251,6 +251,14 @@ contains
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   subroutine Fdirect(Wgi,isigma,dForceg)
+! Calculate the past integral of tau and force 
+! vs z for orbit of energy W, starting at isigma side. Where
+! for untrapped particles (W>=0), v_0=vinf=sqrt(2*W).
+! For trapped particles (W<0), v_0=sqrt(2*(W-psig)).  
+! The integration is done on a z-grid such that dz=v*dtau.
+! isigma is the sign of zg at the start of orbit (v-sign=-isigma)
+! The total needs to account for v-sign=+isigma as well. However,
+! for a symmetric hole that just multiplies force by 2. 
 ! Force integration not using v-integration by parts
 ! dF/dv/xi/(omega df/dW)=(i)\int -dphi/dz|_t \int^t (-dphi/dz|_tau)
 !          exp(-i omega(tau-t)) dtau |dz(t)|        where dz(t)=v(t)dt.
@@ -259,6 +267,7 @@ contains
 !          exp(-i omega(tau-t)) dtau |vinf dt|.
 ! Inner integral is CapPhi=\int^t (-dphi/dz|_tau) exp(-i omega(tau-t)) dtau 
 ! done as exp(-i omega(tau-t)) dtau = d[exp()]/(-i omega)
+! The result needs to be multiplied by df/dWpar.
     complex :: dForceg,CPfactor,exptbb2
     
 !    if(psig.le.0)return ! When restricted to repelling hills. 
@@ -309,9 +318,7 @@ contains
 ! outside the routine because it involves complicated negotiation of
 ! the resonance to preserve accuracy for trapped particles. 
     endif
-!    write(*,'(a,8f10.5)')'Direct tau',taug(ngz),zg(ngz),dForceg,vg(-ngz)
   end subroutine Fdirect
-!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!  
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!  
   subroutine FgRepelEint(Ftotalg,isigma)
@@ -334,15 +341,15 @@ contains
     use shiftmode
     complex Ftp
     logical :: lcompare=.false.
-    complex passforce
+    complex :: passforce,sumpassforce
+    integer, parameter :: ippow=2
+    sumpassforce=0.
     do i=1,nge  ! Passing, corrected for psig sign.
-       Wgarray(i)=max(psig,0.)+Emaxg*(i/float(nge))**2
+       Wgarray(i)=max(psig,0.)+Emaxg*(i/float(nge))**ippow
        vinfarrayp(i)=-isigma*sqrt(2.*Wgarray(i))
-!       write(*,*)'Wgarray(i),vinfarrayp(i)',Wgarray(i),vinfarrayp(i)
-!       call LofW(Wgarray(i),isigma,Forcegarray(i))
        call Fdirect(Wgarray(i),isigma,Forcegarray(i))
        if(i.eq.1)then  ! Start of integration
-          dvinf=abs(vinfarrayp(i))
+          dvinf=abs(vinfarrayp(i))-sqrt(2.*max(psig,0.))
           Ftp=Forcegarray(i)*dfdWpar(vinfarrayp(i),fvinf)&
                &*dvinf*omegag
        else
@@ -358,8 +365,13 @@ contains
           omegad=omega
           call initialize
           call dFdvinfdvy(vinfarrayp(i),passforce)
-          write(*,'(i3,'' shiftmode passing'',f8.4,2e12.5)')i,psig,passforce
-          write(*,'(i3,'' shiftgen  passing'',f8.4,2e12.5)')i,psig,Forcegarray(i)
+!This does not work to give agreement.
+!          sumpassforce=sumpassforce+passforce*dfdWpar(vinfarrayp(i)&
+!               &,fvinf)*dvinf*omegag
+          write(*,'(i3,'' shiftmode passing'',f8.4,4e12.5)')i,psig &
+               &,passforce!,sumpassforce
+          write(*,'(i3,'' shiftgen  passing'',f8.4,4e12.5)')i,psig &
+               &,Forcegarray(i)!,Ftp
        endif
     enddo
     Wgarrayp=Wgarray
@@ -370,7 +382,6 @@ contains
     do i=1,nge  ! Reflected
        Wgarray(i)=psig*(1.-(i/float(nge))**2)
        vinfarrayr(i)=-isigma*sqrt(2.*Wgarray(i))
-!       call LofW(Wgarray(i),isigma,Forcegarray(i))
        call Fdirect(Wgarray(i),isigma,Forcegarray(i))
        if(i.eq.1)then
           dvinf=abs(vinfarrayr(i))-sqrt(2.*psig)

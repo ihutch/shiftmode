@@ -194,7 +194,7 @@ end subroutine testFtEint
     real, dimension(nge) :: vpsiarrayp
     complex :: Ftotalg
     character*40 annote
-    omegag=(.1,0.00000)
+    omegag=(.1,0.001000)
     psig=-.5
     isigma=-1    
     vshift=0.
@@ -213,6 +213,7 @@ end subroutine testFtEint
     call polymark(vinfarrayr,Wgarrayr,nge,1)
     call polyline(vinfarrayr,Wgarrayr,nge)
     call polyline(vpsiarrayp,Wgarrayp,nge)
+    call polymark(vpsiarrayp,Wgarrayp,nge,2)
     
     call minmax(forcegp,2*nge,pmin,pmax)
     call minmax(forcegr,2*nge,rmin,rmax)
