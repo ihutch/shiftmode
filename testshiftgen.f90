@@ -1,14 +1,3 @@
-
-!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-subroutine testFtEint
-  use shiftgen
-  use shiftmode
-  omegag=(5.,0.02)
-  psig=-.5
-  isigma=-1    
-  vshift=1.
-  
-end subroutine testFtEint
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
   subroutine testLofW
@@ -152,6 +141,8 @@ end subroutine testFtEint
     call dcharsize(.018,.018)
     call multiframe(2,1,2)
        call FgRepelEint(Ftotalg,isigma)
+       write(*,*)'Repelling Ftotalpg',Ftotalpg
+       write(*,*)'Repelling Ftotalrg',Ftotalrg
        call pltinit(vinfarrayr(nge),vinfarrayp(nge),0.,Wgarrayp(nge))
        call axis
        call axlabels('v!d!A;!@!d','W')
@@ -322,8 +313,8 @@ end subroutine testFtEint
   end subroutine tsparse
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
        
-!  call testLofW
+  call testLofW
   call testFrepel
   call testAttract
-!  call Frepelofomega
+  call Frepelofomega
 end program

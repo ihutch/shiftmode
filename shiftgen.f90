@@ -38,7 +38,7 @@
 ! valley psi<0.
 
 module shiftgen
-  integer, parameter :: ngz=100,nge=200
+  integer, parameter :: ngz=100,nge=100
   real, dimension(-ngz:ngz) :: zg,vg,ones=1.,phig,phigprime,taug
   complex, dimension(-ngz:ngz) :: Lg,CapPhig
   complex :: omegag=(1.,0.),sqm1=(0.,1.),Ftot,dFordirect
@@ -330,7 +330,6 @@ contains
     complex Ftotalg
     Emaxg=4.*Tinf+vshift**2
     call FgPassingEint(Ftotalpg,isigma,Emaxg)
-    write(*,*)'Repelling Ftotalpg',Ftotalpg
     call FgReflectedEint(Ftotalrg,isigma)
 !    write(*,'(i3,6f10.4)')50,vinfarrayr(50),Forcegarray(50),Forcegr(50)&
 !         ,dfdWpar(vinfarrayr(50),fvinv)
@@ -342,7 +341,7 @@ contains
     complex Ftp
     logical :: lcompare=.false.
     complex :: passforce,sumpassforce
-    integer, parameter :: ippow=2
+    integer, parameter :: ippow=3
     sumpassforce=0.
     do i=1,nge  ! Passing, corrected for psig sign.
        Wgarray(i)=max(psig,0.)+Emaxg*(i/float(nge))**ippow
