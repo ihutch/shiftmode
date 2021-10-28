@@ -319,7 +319,7 @@
   end subroutine tsparse
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
        
-  call testLofW
+!  call testLofW
 !  call testFrepel
   call testAttract
 !  call Frepelofomega
