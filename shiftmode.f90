@@ -523,7 +523,8 @@ contains
     phi0=psi/cosh(x0/pL)**4+Wj
     phi1=psi/cosh(x1/pL)**4+Wj
     if(sign(1.,phi1).eq.sign(1.,phi0))then
-       write(*,*)'orbitend energies do not bracket zero',phi0,phi1
+       write(*,*)'orbitendM energies do not bracket zero',phi0,phi1
+       write(*,*)x0,x1,psi,Wj
        stop
     endif
     do i=1,nbi

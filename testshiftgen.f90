@@ -44,7 +44,8 @@
 ! Testing against shiftmode. We must use positive velocity in the
 ! shiftmode calculation because it is not set up to use negative
 ! integration direction. The sign change is then in the print out. 
-      if(Wg.lt.0)then          ! Trapped
+       if(Wg.lt.0)then          ! Trapped
+          xL=20.
           vpsig=sqrt(2.*(Wg-psig))
           call dFdvpsidvy(vpsig,forcet(i),tb,xlent)
           tdur=tb/2
@@ -64,6 +65,9 @@
        write(*,'(a, 5f10.6)')'Fdirect real,imag     ',dFdirect(i)
           
     enddo
+! Put xL back to default
+    xL=20
+
     if(lplotmz)call pltend
 
     call pfset(3)
@@ -189,6 +193,7 @@
     psig=-.5
     isigma=-1    
     vshift=0.
+!    write(*,*)'Entered testattract'
     write(annote,'(''!Ay!@='',f5.3,'' !Aw!@=('',f5.3'','',f5.3,'')'')')&
          psig,real(omegag),imag(omegag)
     call dcharsize(.018,.018)
@@ -232,6 +237,7 @@
     omega=omegag
     omegad=omega
     omegac=10.
+    write(*,*)'Calling shiftmode initialize'
     call initialize
     call SumHarmonics
     write(*,*)'Ftraptotal mode',Ftraptotal
@@ -314,7 +320,7 @@
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
        
   call testLofW
-  call testFrepel
+!  call testFrepel
   call testAttract
-  call Frepelofomega
+!  call Frepelofomega
 end program

@@ -17,8 +17,7 @@
 ! be set to omega/omega_{ps}, different for different mass
 ! species. For different charge sign, the hill peak psig must likewise
 ! be opposite. The length scale is normally the Debye length for some
-! reference temperature, the default spatial extent is |zm|=10.  The
-! units of returned force
+! reference temperature, the default spatial extent is |zm|=10.
 
 ! The force is the integral dz of -d\phi/dz times the non-adiabatic
 ! perturbed f, which is an integral over the past time d\tau of the
@@ -41,7 +40,7 @@ module shiftgen
   integer, parameter :: ngz=100,nge=100
   real, dimension(-ngz:ngz) :: zg,vg,ones=1.,phig,phigprime,taug
   complex, dimension(-ngz:ngz) :: Lg,CapPhig
-  complex :: omegag=(1.,0.),sqm1=(0.,1.),Ftot,dFordirect
+  complex :: omegag=(1.,0.),sqm1g=(0.,1.),Ftot,dFordirect
   complex :: omegabg(0:nge),Forcegarray(nge),Forcegp(nge),Forcegr(nge)
   real :: Wgarray(nge),Wgarrayp(nge),Wgarrayr(nge),vinfarrayp(nge)&
        &,vinfarrayr(nge),tbr(nge),tbp(nge),Wgarrayu(nge)
@@ -74,7 +73,7 @@ contains
     ivs=-1
     if(psig.gt.0)then ! Repelling potential
        gK=sqrt(max(0.,Wg/psig-1.))
-       z1=zR; z2=isigma*zm-zR     ! Or maybe z2=zm
+       z1=zR; z2=isigma*zm-zR
        if(Wg.lt.psig)ivs=1  ! Reflected orbit, all z are same sign.
     elseif(psig.lt.0)then !Attracted
        gK=-1.-10.*sqrt(max(0.,-Wg/psig))
@@ -88,7 +87,6 @@ contains
        write(*,*)'ERROR psi is zero'
        stop
     endif
-!    write(*,*)'makezg: z1,z2,gK',z1,z2,gK
     do i=0,ngz
        zi=float(i)/ngz
        zg(i)=ivs*(z1+z2*((2.*gK+zi)*zi)/(1.+2.*gK))
@@ -150,7 +148,7 @@ contains
     phigprimeofz=-psig*sinh(zval/4.)/cosh(zval/4.)**5
   end function phigprimeofz
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  subroutine LofW(Wgi,isigma,dForceg) !Obsolete.
+  subroutine LofW(Wgi,isigma,dForceg) !Obsolete. Retained only for testing
   ! Calculate the past integral of tau and Lg(tau)
   ! vs z for orbit of energy W, starting at isigma side. Where
   ! Lg= \int_{-\infty}^{t} (v-v_0)*exp(-i*omegag(tau-t)dtau.
@@ -208,24 +206,24 @@ contains
        endif
        if(dtau.gt.10)write(*,*)'JUMP?',phigp,vg(i),vmean
        taug(i)=taug(i-1)+dtau
-!       Lgfactor=exp(sqm1*omegag*dtau) ! Current exponential
-          CPfactor=exp(sqm1*omegag*dtau) ! Current exponential
-          CapPhig(i)=CPfactor*CapPhig(i-1)-phigp*(1.-CPfactor)*sqm1/omegag
-          ddF1=-sqm1*0.5*(CapPhig(i)*phigprime(i)+CapPhig(i-1)&
+!       Lgfactor=exp(sqm1g*omegag*dtau) ! Current exponential
+          CPfactor=exp(sqm1g*omegag*dtau) ! Current exponential
+          CapPhig(i)=CPfactor*CapPhig(i-1)-phigp*(1.-CPfactor)*sqm1g/omegag
+          ddF1=-sqm1g*0.5*(CapPhig(i)*phigprime(i)+CapPhig(i-1)&
                &*phigprime(i-1)) *abs(vg(-ngz)*dtau)
-          ddF3=(CPfactor-1.)/(sqm1*omegag)
-          ddF2=-sqm1*phigp*(ddF3*CapPhig(i-1)-phigp*(dtau-ddF3)&
-               &*sqm1/omegag) *abs(vg(-ngz))  ! Integral corrected.
+          ddF3=(CPfactor-1.)/(sqm1g*omegag)
+          ddF2=-sqm1g*phigp*(ddF3*CapPhig(i-1)-phigp*(dtau-ddF3)&
+               &*sqm1g/omegag) *abs(vg(-ngz))  ! Integral corrected.
           dFordirect=dFordirect+ddF2
           Lg(i)=CPfactor*Lg(i-1)-(vmean-v0)*(1.-CPfactor)/omegag
 ! Old simple version without step integral correction.
-          ddF1=-sqm1*omegag*0.5*(Lg(i)*phigprime(i)+Lg(i-1)&
+          ddF1=-sqm1g*omegag*0.5*(Lg(i)*phigprime(i)+Lg(i-1)&
                &*phigprime(i-1))*vpsig*dtau
 ! Integral corrected version is incorrect for reflected particles.
-          ddF2=-sqm1*phigp*(ddF3*Lg(i-1)*omegag+(vmean-v0)*(dtau-ddF3) &
-               &*sqm1/omegag) *abs(vg(-ngz))  ! Integral corrected.
+          ddF2=-sqm1g*phigp*(ddF3*Lg(i-1)*omegag+(vmean-v0)*(dtau-ddF3) &
+               &*sqm1g/omegag) *abs(vg(-ngz))  ! Integral corrected.
           dForceg=dForceg+ddF1
-!          dForceg=dForceg-sqm1*omegag* 0.5*(Lg(i)*phigprime(i)+Lg(i-1)&
+!          dForceg=dForceg-sqm1g*omegag* 0.5*(Lg(i)*phigprime(i)+Lg(i-1)&
 !               &*phigprime(i-1))*vpsig*dtau
 !          write(*,*)dForceg,dFordirect
        if(.not.real(dForceg).lt.1.e6)then
@@ -235,17 +233,17 @@ contains
        endif
     enddo
     if(Wg.lt.0)then     ! Trapped orbit. Add resonant term. 
-       exptbb2=exp(sqm1*omegag*taug(ngz))
+       exptbb2=exp(sqm1g*omegag*taug(ngz))
 ! This form is to be divided by (1-exptb) full resonant denominator.
 ! But it would probably be better to remove a (1.-exptbb2**2) factor and
 ! Divide only the resonant term by (1.+exptbb2) later.
        dForceg=dForceg*(1.-exptbb2**2) &
-            + sqm1*Lg(ngz)**2*omegag**2*(1.-exptbb2)*vpsig
+            + sqm1g*Lg(ngz)**2*omegag**2*(1.-exptbb2)*vpsig
 ! In shiftmode the division by the resonant denominator is done
 ! outside the routine because it involves complicated negotiation of
 ! the resonance to preserve accuracy for trapped particles. 
     elseif(Wg.lt.psig)then  ! Reflected orbit. Add integration correction.
-       dForceg=dForceg+sqm1*2.*vg(-ngz)**2*vpsig      !  *omegag
+       dForceg=dForceg+sqm1g*2.*vg(-ngz)**2*vpsig      !  *omegag
     endif
   end subroutine LofW
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -270,11 +268,8 @@ contains
 ! The result needs to be multiplied by df/dWpar.
     complex :: dForceg,CPfactor,exptbb2
     
-!    if(psig.le.0)return ! When restricted to repelling hills. 
     Wg=Wgi
     call makezg(isigma) ! Sets various time array values.
-!    write(*,*)'Wg=',Wg,' psig=',psig,' isigma=',isigma
-!    write(*,'(10f8.4)')vg,zg
     vpsig=vg(-ngz)            ! Untrapped default ...
     if(Wg.lt.0.)vpsig=vg(0)   ! Trapped particle f(v) reference.
     ips=int(sign(1.,psig))
@@ -294,26 +289,26 @@ contains
           dtau=((zg(i)-zg(i-1))*vmean/(vg(i-1)*vg(i)))
           if(ips.le.0..or.zR.eq.0)iws=i   ! Attracted or unreflected
        endif
-       if(.not.dtau.lt.1e6)then
+       if(.not.dtau.lt.1e6)then           ! Test for NAN error
           write(*,*)i,'dtau=',dtau,v0,vg(i-1),vg(i),zR,Wg,vpsig,phigp
           stop
        endif
        taug(i)=taug(i-1)+dtau
-       CPfactor=exp(sqm1*omegag*dtau) ! Current exponential
-       CapPhig(i)=CPfactor*CapPhig(i-1)-phigp*(1.-CPfactor)*sqm1/omegag
-       dForceg=dForceg-sqm1*&
+       CPfactor=exp(sqm1g*omegag*dtau) ! Current exponential
+       CapPhig(i)=CPfactor*CapPhig(i-1)-phigp*(1.-CPfactor)*sqm1g/omegag
+       dForceg=dForceg-sqm1g*&
             0.5*(CapPhig(i)*phigprime(i)+CapPhig(i-1)*phigprime(i-1))&
             *abs(vpsig*dtau)
 !       write(*,'(a,i4,8f10.5)')'CapPhiStep',i,taug(i),zg(i),CapPhig(i),dForceg
     enddo
     if(Wg.lt.0)then     ! Trapped orbit. Add resonant term. 
-       exptbb2=exp(sqm1*omegag*taug(ngz))
+       exptbb2=exp(sqm1g*omegag*taug(ngz))
 ! This form is to be divided by (1-exptb) full resonant denominator.
 ! But it would probably be better to remove a (1.-exptbb2**2) factor and
 ! Divide only the resonant term by (1.+exptbb2) later.
        vpsig=abs(vg(0))
        dForceg=dForceg*(1.-exptbb2**2) &
-            + sqm1*CapPhig(ngz)**2*(1.-exptbb2)*vpsig
+            + sqm1g*CapPhig(ngz)**2*(1.-exptbb2)*vpsig
 ! In shiftmode the division by the resonant denominator is done
 ! outside the routine because it involves complicated negotiation of
 ! the resonance to preserve accuracy for trapped particles. 
@@ -337,12 +332,9 @@ contains
   end subroutine FgRepelEint
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   subroutine FgPassingEint(Ftp,isigma,Emaxg)
-    use shiftmode
     complex Ftp
     logical :: lcompare=.false.
-    complex :: passforce,sumpassforce
     integer, parameter :: ippow=3
-    sumpassforce=0.
     do i=1,nge  ! Passing, corrected for psig sign.
        Wgarray(i)=max(psig,0.)+Emaxg*(i/float(nge))**ippow
        vinfarrayp(i)=-isigma*sqrt(2.*Wgarray(i))
@@ -358,20 +350,7 @@ contains
        endif
        Forcegp(i)=Forcegarray(i)*omegag*dfdWpar(vinfarrayp(i),fvinf)
        tbp(i)=taug(ngz)
-       if(lcompare)then
-          psi=-psig                     ! psi is the positive depth
-          omega=omegag
-          omegad=omega
-          call initialize
-          call dFdvinfdvy(vinfarrayp(i),passforce)
-!This does not work to give agreement.
-!          sumpassforce=sumpassforce+passforce*dfdWpar(vinfarrayp(i)&
-!               &,fvinf)*dvinf*omegag
-          write(*,'(i3,'' shiftmode passing'',f8.4,4e12.5)')i,psig &
-               &,passforce!,sumpassforce
-          write(*,'(i3,'' shiftgen  passing'',f8.4,4e12.5)')i,psig &
-               &,Forcegarray(i)!,Ftp
-       endif
+       if(lcompare)call Fpasscompare(i)
     enddo
     Wgarrayp=Wgarray
   end subroutine FgPassingEint
@@ -409,11 +388,11 @@ contains
   end subroutine FgAttractEint
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!  
   subroutine FgTrappedEint(Ftotal,dfperpdWperp,fperp,isigma)
-    use shiftmode    ! shows hack definition conflicts, and testing
-    logical :: lcompare=.false.  ! Make True Only if using shiftmode
+!    use shiftmode    ! shows hack definition conflicts, and testing
+    logical :: lcompare=.true.  ! Make True Only if using shiftmode
     ! Integrate over fe (trapped). Wj=vpsi^2/2-psi. So vpsi=sqrt(2(psi+Wj))
     ! We must use cells that fill the Wj range 0 to -psi.
-    complex :: Ftotal,dFdvpsi,exptb,exptbprev,cdvpsi,dob,dFdvpsig
+    complex :: Ftotal,exptb,exptbprev,cdvpsi,dob,dFdvpsig
     real :: dfperpdWperp,fperp,obi
     integer :: isigma
     
@@ -447,16 +426,16 @@ contains
        Forcegr(i)=Forcegarray(i)*omegag*dfe
        omegabg(i)=2.*pig/(2.*taug(ngz))
        call pathshiftg(i,obi)
-       omegabg(i)=omegabg(i)+sqm1*obi
-       exptb=exp(sqm1*omegadg*2*pig/omegabg(i))
+       omegabg(i)=omegabg(i)+sqm1g*obi
+       exptb=exp(sqm1g*omegadg*2*pig/omegabg(i))
        if(.not.abs(exptb).lt.1.e10)exptb=1.e10  ! Enable divide by infinity
        if(i.eq.1)exptbprev=exptb
        dob=omegabg(i)-omegabg(i-1)
-       cdvpsi=dvpsi*(1.+sqm1*imag(dob)/real(dob))
+       cdvpsi=dvpsi*(1.+sqm1g*imag(dob)/real(dob))
        ! Strictly to get dFdvpsi we need to multiply by the omega f' terms
        Fnonresg(i)=dFdvpsig*(omegadg*dfe-(omegadg-omegag)*dfeperp)
        ! and correct for the imaginary shift of omegabg:
-       Fnonresg(i)=Fnonresg(i)+sqm1*real(Fnonresg(i)-Fnonresg(i-1))  &
+       Fnonresg(i)=Fnonresg(i)+sqm1g*real(Fnonresg(i)-Fnonresg(i-1))  &
             /real(omegabg(i)-omegabg(i-1))*obi
        if(taug(ngz)*imag(omegadg).lt.-2.)then!Hack fix giant dFdvpsi problem
           write(*,*)'Drop',taug(ngz),imag(omegadg),dFdvpsig
@@ -478,23 +457,8 @@ contains
        endif
        ! Multiply by 2. to account for \pm v_\psi.
        Ftotal=Ftotal+2.*Ftrapg(i)       ! Add to Ftotal integral.
-       if(lcompare)then ! Set some shiftmode values
-          psi=-psig                     ! psi is the positive depth
-          omega=omegag
-          omegad=omega
-          call initialize
-          call dFdvpsidvy(vpsi,dFdvpsi,tbi,xln)
-          Fnonres(i)=dFdvpsi*(omegadg*dfe-(omegadg-omegag)*dfeperp)
-          Fnonres(i)=Fnonres(i)+sqm1*real(Fnonres(i)-Fnonres(i-1))  &
-               /real(omegabg(i)-omegabg(i-1))*obi
-          Ftrap(i)=0.5*(Fnonres(i)/(1.-exptb) &
-               +Fnonres(i-1)/(1.-exptbprev))*cdvpsi
-          Ftotalmode=Ftotalmode+2.*Ftrap(i)       ! Add to Ftotal integral.
-          write(*,'(i3,'' shiftmode'',2f10.5,$)')i,tbi,real(Ftotalmode)
-          write(*,*)dFdvpsi
-          write(*,'(i3,'' shiftgen '',2f10.5,$)')i,2.*taug(ngz),real(Ftotal)
-          write(*,*)dFdvpsig
-       endif
+       if(lcompare)call  Ftrapcompare(i,dfe,dfeperp,obi,exptb&
+            &,exptbprev,cdvpsi,Ftotal,dFdvpsig,vpsi)
        vpsiprev=vpsi
        feprev=fe
 !       dFdvprev=dFdvpsi
@@ -508,13 +472,9 @@ contains
     Ftotal=Ftotal+2.*Ftrapg(nge)
     Wgarray(nge)=psig
     Wgarrayr=Wgarray
-    if(lcompare)then  ! Get the shiftmode Ftotal.
-       call FtEint(Ftotalmode,dfperpdWperp,fperp)
-       write(*,*)'Fotalmode vs Ftotal (gen)'
-       write(*,*)Ftotalmode
-       write(*,*)Ftotal
-    endif
-  end subroutine FgTrappedEint
+    if(lcompare)call  Ftrapcompare(i,dfe,dfeperp,obi,exptb&
+         &,exptbprev,cdvpsi,Ftotal,dFdvpsig,vpsi)
+      end subroutine FgTrappedEint
 !****************************************************************
 ! This is exp(X^2)*erfc(X)
       FUNCTION expERFCC(X)
@@ -589,3 +549,58 @@ contains
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 end module shiftgen
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+! The following are routines that need to use shiftmode module.
+! They are needed by shiftgen module routines, but are separated
+! so as to make shiftgen formally require no use of shiftmode.
+!****************************************************************
+! Potentially free-standing routine.
+ subroutine Ftrapcompare(i,dfe,dfeperp,obi,exptb&
+       &,exptbprev,cdvpsi,Ftotal,dFdvpsig,vpsi)
+    use shiftgen
+    use shiftmode
+    complex :: Ftotal,dFdvpsi,exptb,exptbprev,cdvpsi,dFdvpsig
+    if(i.lt.nge)then
+    psi=-psig                     ! psi is the positive depth
+    omega=omegag
+    omegad=omega
+!          write(*,*)'FgA calling shiftmode initialize'
+    call initialize
+    call dFdvpsidvy(vpsi,dFdvpsi,tbi,xln)
+    Fnonres(i)=dFdvpsi*(omegadg*dfe-(omegadg-omegag)*dfeperp)
+    Fnonres(i)=Fnonres(i)+sqm1g*real(Fnonres(i)-Fnonres(i-1))  &
+         /real(omegabg(i)-omegabg(i-1))*obi
+    Ftrap(i)=0.5*(Fnonres(i)/(1.-exptb) &
+         +Fnonres(i-1)/(1.-exptbprev))*cdvpsi
+    Ftotalmode=Ftotalmode+2.*Ftrap(i)       ! Add to Ftotal integral.
+    write(*,'(i3,'' shiftmode'',2f10.5,$)')i,tbi,real(Ftotalmode)
+    write(*,*)dFdvpsi
+    write(*,'(i3,'' shiftgen '',2f10.5,$)')i,2.*taug(ngz),real(Ftotal)
+    write(*,*)dFdvpsig
+    else
+    write(*,*)'Calling FtEint'
+    call FtEint(Ftotalmode,dfperpdWperp,fperp)
+    write(*,*)'Fotalmode vs Ftotal (gen)'
+    write(*,*)Ftotalmode
+    write(*,*)Ftotal
+    endif
+  end subroutine Ftrapcompare
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!  
+! Potentially free-standing routine
+  subroutine Fpasscompare(i) ! Do shiftmode version too.
+    use shiftgen
+    use shiftmode
+    complex :: passforce,sumpassforce
+    if(i.eq.1)sumpassforce=0.
+    psi=-psig                     ! psi is the positive depth
+    omega=omegag
+    omegad=omega
+    call initialize
+    call dFdvinfdvy(vinfarrayp(i),passforce)
+!This does not work to give agreement.
+!          sumpassforce=sumpassforce+passforce*dfdWpar(vinfarrayp(i)&
+!               &,fvinf)*dvinf*omegag
+    write(*,'(i3,'' shiftmode passing'',f8.4,4e12.5)')i,psig &
+         &,passforce!,sumpassforce
+    write(*,'(i3,'' shiftgen  passing'',f8.4,4e12.5)')i,psig &
+         &,Forcegarray(i)!,Ftp
+  end subroutine Fpasscompare
