@@ -9,7 +9,9 @@
     complex :: dForceg(nw),forcet(nw),dFdirect(nw)
     integer :: iwsa(nw)
     real :: Wn(nw)
+    real, dimension(-ngz:ngz) :: ones
     logical :: lplotmz=.true.
+    ones=1.
     omegag=(5.,0.02)
     psig=-.5
     omegad=omegag
@@ -198,7 +200,8 @@
          psig,real(omegag),imag(omegag)
     call dcharsize(.018,.018)
     call multiframe(2,1,2)
-    call FgAttractEint(Ftotalg,isigma)
+!    call FgAttractEint(Ftotalg,isigma)
+    call FgEint(Ftotalg,isigma)  ! Generic call is the same.
 !    write(*,*)'Return from FgAttractEint. Ftotalg=',Ftotalg
     vpsiarrayp=sqrt(2.*(Wgarrayp(1:nge)-psig))
 !    call pltinit(vinfarrayr(nge),vinfarrayp(nge),psig,Wgarrayp(nge))
@@ -237,7 +240,7 @@
     omega=omegag
     omegad=omega
     omegac=10.
-    write(*,*)'Calling shiftmode initialize'
+    write(*,*)'testAttract: Calling shiftmode initialize'
     call initialize
     call SumHarmonics
     write(*,*)'Ftraptotal mode',Ftraptotal
@@ -246,6 +249,7 @@
     write(*,*)'Fpasstotal gen ',Ftotalpg
     write(*,*)'Sum mode       ',Ftraptotal+Fpasstotal
     write(*,*)'Sum gen        ',Ftotalrg+Ftotalpg
+    write(*,*)'Ftotalg        ',Ftotalg
   end subroutine testAttract
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   subroutine Frepelofomega
@@ -297,6 +301,18 @@
     call pltend
   end subroutine Frepelofomega
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  subroutine testSumHarm
+    use shiftgen
+!    complex :: Ftotalg
+    write(*,*)'testSumHarm psig                  omegag,              Omegacg'
+    write(*,*)psig,omegag,Omegacg
+    isigma=-1
+!    call FgEint(Ftotalg,isigma)  ! Generic call is the same.
+!    write(*,*)'Ftotalg        ',Ftotalg
+    call SumHarmonicsg(isigma)
+    write(*,*)'Ftotalpg=',Ftotalpg
+  end subroutine testSumHarm
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   subroutine tsparse(ormax,oi,nvs)
     use shiftgen
     character*30 argument
@@ -308,19 +324,25 @@
        if(argument(1:3).eq.'-zm')read(argument(4:),*)zm
        if(argument(1:3).eq.'-or')read(argument(4:),*)ormax
        if(argument(1:3).eq.'-oi')read(argument(4:),*)oi
+       if(argument(1:3).eq.'-oc')read(argument(4:),*)Omegacg
+       if(argument(1:3).eq.'-kg')read(argument(4:),*)kg
        if(argument(1:2).eq.'-n')read(argument(3:),*)nvs
        if(argument(1:2).eq.'-h')goto 1
     enddo
     return
 1   continue
-    write(*,*)' Usage: testshiftgen [-p,-v,-i,-zm,-or,-oi,-h]'
-    write(*,'(a,f8.3,a,f8.3,a,f8.3,a,f8.3,a,i2,a,f8.3,a,f8.3)')&
-         'psi=',psig,' zm=',zm,' omax=',ormax,' v=',vshift,' nv=',nvs
+    write(*,*)' Usage: testshiftgen [-p,-v,-i,-zm,-or,-oi,-oc,-n,-h]'
+    write(*,'(a,f8.3,a,f8.3,a,f8.3,a,f8.3,a,i3,a,f8.3,a,f8.3)')&
+         'psi=',psig,' zm=',zm,' omax=',ormax,' v=',vshift,' nv=',nvs&
+         ,' oc=',Omegacg,' kg=',kg
   end subroutine tsparse
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  integer :: nvs=1
+  call tsparse(ormax,oi,nvs)
        
 !  call testLofW
 !  call testFrepel
   call testAttract
+  call testSumHarm
 !  call Frepelofomega
 end program

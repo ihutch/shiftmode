@@ -10,12 +10,11 @@
     complex :: Ftotal,dFdvpsi,exptb,exptbprev,cdvpsi,dFdvpsig
     if(i.lt.nge)then
     psi=-psig                     ! psi is the positive depth
-    omega=omegag
-    omegad=omega
+    omegaonly=omegag
 !          write(*,*)'FgA calling shiftmode initialize'
     call initialize
     call dFdvpsidvy(vpsi,dFdvpsi,tbi,xln)
-    Fnonres(i)=dFdvpsi*(omegadg*dfe-(omegadg-omegag)*dfeperp)
+    Fnonres(i)=dFdvpsi*(omegag*dfe-(omegag-omegaonly)*dfeperp)
     Fnonres(i)=Fnonres(i)+sqm1g*real(Fnonres(i)-Fnonres(i-1))  &
          /real(omegabg(i)-omegabg(i-1))*obi
     Ftrap(i)=0.5*(Fnonres(i)/(1.-exptb) &

@@ -10,7 +10,7 @@
 ! therefore three types of orbit: Passing, Trapped, or Reflected,
 ! which must be treated differently.
 
-! The orbit's equation of motion is dv/dt=-d\phi/dz, which means for
+! An orbit's equation of motion is dv/dt=-d\phi/dz, which means for
 ! species s of different mass, that the time is scaled differently: to
 ! omega_{ps}. Consequently, for a particular perturbation frequency
 ! omega, when there are multiple species the scaled value omegag must
@@ -18,10 +18,11 @@
 ! species. For different charge sign, the hill peak psig must likewise
 ! be opposite. The length scale is normally the Debye length for some
 ! reference temperature, the default spatial extent is |zm|=10.
+! But for energies near zero is sometimes automatically lengthened.
 
 ! The force is the integral dz of -d\phi/dz times the non-adiabatic
 ! perturbed f, which is an integral over the past time d\tau of the
-! past orbit, integrated over velocity, using total (distant) density
+! orbit, integrated over velocity, using total (distant) density
 ! of unity, and given (linearized) for a unit perturbing z-shift.
 
 ! Both space and past time integrals can be expressed as time
@@ -37,22 +38,27 @@
 ! valley psi<0.
 
 module shiftgen
-  integer, parameter :: ngz=100,nge=200
-  real, dimension(-ngz:ngz) :: zg,vg,ones=1.,phig,phigprime,taug
-  complex, dimension(-ngz:ngz) :: Lg,CapPhig
   complex :: omegag=(1.,0.),sqm1g=(0.,1.),Ftot,dFordirect
+  complex :: omegaonly=(1.,0.) ! Gets set in SumHarmonicsg
+  real :: psig=.1,Wg,zm=10.,v0,z0,z1,z2,zR,kg=0.,Omegacg=5.
+  real :: vshift=0.,Tinf=1.,Tperpg=1.
+  integer :: ivs,iws
+  integer, parameter :: ngz=100,nge=200,nhmax=50
+  integer :: iwpowg=2,nharmonics
+  real,parameter :: pig=3.1415926
+! Spatial Arrays
+  real, dimension(-ngz:ngz) :: zg,vg,phig,phigprime,taug
+  complex, dimension(-ngz:ngz) :: Lg,CapPhig
+! Parallel energy arrays
   complex :: omegabg(0:nge),Forcegarray(nge),Forcegp(nge),Forcegr(nge)
   real :: Wgarray(nge),Wgarrayp(nge),Wgarrayr(nge),vinfarrayp(nge)&
        &,vinfarrayr(nge),tbr(nge),tbp(nge),Wgarrayu(nge)
-  real :: psig=.1,Wg,zm=10.,v0,z0,z1,z2,zR
-  real :: vshift=0.,Tinf=1.
-  integer :: ivs,iws
-  !Definitions from FgTrappedEint moved to module declarations.
-  complex :: Fnonresg(0:nge),Ftrapg(0:nge),omegadg
+  complex :: Fnonresg(0:nge),Ftrapg(0:nge)
+! Perpendicular Harmonic force arrays.
+  complex, dimension(-nhmax:nhmax) :: Frg,Ftg,Fpg
+! Total forces
   complex :: Ftotalmode
   complex :: Ftotalrg,Ftotalpg
-  integer :: iwpowg=2
-  real,parameter :: pig=3.1415926
 contains
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   subroutine makezg(isigma)
@@ -282,12 +288,11 @@ contains
   subroutine FgTrappedEint(Ftotal,dfperpdWperp,fperp,isigma)
     logical :: lcompare=.false.  ! Make True Only if using shiftmode
     ! Integrate over fe (trapped). Wj=vpsi^2/2-psi. So vpsi=sqrt(2(psi+Wj))
-    ! We must use cells that fill the Wj range 0 to -psi.
+    ! Wj range 0 to -psi.
     complex :: Ftotal,exptb,exptbprev,cdvpsi,dob,dFdvpsig
     real :: dfperpdWperp,fperp,obi
     integer :: isigma
     
-    omegadg=omegag  ! More generally omegadg=omegag-k*vy(i).
     Ftotal=0.
     Wjprev=0.
     Ftotalmode=0.
@@ -318,18 +323,18 @@ contains
        omegabg(i)=2.*pig/(2.*taug(ngz))
        call pathshiftg(i,obi)
        omegabg(i)=omegabg(i)+sqm1g*obi
-       exptb=exp(sqm1g*omegadg*2*pig/omegabg(i))
+       exptb=exp(sqm1g*omegag*2*pig/omegabg(i))
        if(.not.abs(exptb).lt.1.e10)exptb=1.e10  ! Enable divide by infinity
        if(i.eq.1)exptbprev=exptb
        dob=omegabg(i)-omegabg(i-1)
        cdvpsi=dvpsi*(1.+sqm1g*imag(dob)/real(dob))
        ! Strictly to get dFdvpsi we need to multiply by the omega f' terms
-       Fnonresg(i)=dFdvpsig*(omegadg*dfe-(omegadg-omegag)*dfeperp)
+       Fnonresg(i)=dFdvpsig*(omegag*dfe-(omegag-omegag)*dfeperp)
        ! and correct for the imaginary shift of omegabg:
        Fnonresg(i)=Fnonresg(i)+sqm1g*real(Fnonresg(i)-Fnonresg(i-1))  &
             /real(omegabg(i)-omegabg(i-1))*obi
-       if(taug(ngz)*imag(omegadg).lt.-2.)then!Hack fix giant dFdvpsi problem
-          write(*,*)'Drop',taug(ngz),imag(omegadg),dFdvpsig
+       if(taug(ngz)*imag(omegag).lt.-2.)then!Hack fix giant dFdvpsi problem
+          write(*,*)'Drop',taug(ngz),imag(omegag),dFdvpsig
           Fnonresg(i)=0. 
        endif
        ! Then multiply by the resonance factor and the complex dvpsi and sum.
@@ -341,7 +346,7 @@ contains
           write(*,*)'Ftrapg NAN?',i
           write(*,*)Fnonresg(i),Ftrapg(i)
           write(*,*)omegabg(i-1),omegabg(i)
-          write(*,*)omegadg,omegadg/omegabg(i)
+          write(*,*)omegag,omegag/omegabg(i)
           write(*,*)exptb,exptbprev
           write(*,*)dvpsi,vpsi,vpsiprev
           stop
@@ -365,7 +370,64 @@ contains
     Wgarrayr=Wgarray
     if(lcompare)call  Ftrapcompare(i,dfe,dfeperp,obi,exptb&
          &,exptbprev,cdvpsi,Ftotal,dFdvpsig,vpsi)
-      end subroutine FgTrappedEint
+  end subroutine FgTrappedEint
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  subroutine FgEint(Ftotalg,isigma)
+    complex :: Ftotalg
+    if(psig.gt.0)then
+       call FgRepelEint(Ftotalg,isigma)
+    else
+       call FgAttractEint(Ftotalg,isigma)
+    endif
+  end subroutine FgEint
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  subroutine SumHarmonicsg(isigma)
+    implicit none
+    integer :: isigma
+    ! Sum harmonic contributions to obtain Forces for specified
+    ! k, Omegacg. Does the job v-perp integration. 
+    real :: EIm(0:nhmax),xit,vymax,hnum
+    integer :: m,ncalc
+    real :: Oceff   ! The effective Omegacg
+! The maximum needed perp velocity, such that kg*vymax/Oc=nharmonics
+    vymax=3.5*sqrt(2.*Tperpg)
+    Oceff=max(Omegacg,kg*vymax/nhmax) ! Don't allow zero Oceff.
+! How many harmonics do we actually need? Nominally:
+    hnum=kg*vymax/Oceff
+! If nharmonics is small, then use rather more for accuracy.
+    nharmonics=min(nhmax,int(hnum*(1.+3./(hnum+1.))))
+    xit=kg*sqrt(Tperpg)/Oceff
+    write(*,*)vymax,hnum,xit
+! Calculate the Integer[0.] exp*I[2] Bessel functions 0 to nharmonics
+    call RIBESL(xit**2,0.,nharmonics+1,2,EIm,ncalc)
+    if(.not.ncalc.eq.nharmonics+1)then ! All orders not calculated correctly.  
+       write(*,'(a,i3,a,i3,a)')'Bessel functions',ncalc,' of',nharmonics+1, &
+       ' are precise. Others may be irrelevant.' 
+    endif
+! m=0 always used.! fy is Maxwellian.
+! But the fywy,fy need to be fixed in inner routines.
+    omegaonly=omegag
+    call FgEint(Fpg(0),isigma)
+    write(*,*)'SumHarmonicsg: Oceff,nharmonics=',Oceff,nharmonics
+    write(*,*)'EIm(0),Fpg(0)=',EIm(0),Fpg(0)
+    Ftotalpg=Fpg(0)*EIm(0)
+    do m=1,nharmonics
+       omegag=omegaonly+m*Oceff
+       call FgEint(Fpg(m),isigma)
+       write(*,*)'EIm(m),Fpg(m)=',EIm(m),Fpg(m)
+       if(real(omegaonly).eq.0)then   !Short cut.
+          Ftotalpg=Ftotalpg+2*real(Fpg(m))*EIm(m)
+       else      ! Full sum over plus and minus m.
+          Ftotalpg=Ftotalpg+Fpg(m)*EIm(m)
+          omegag=omegaonly-m*Oceff
+          call FgEint(Fpg(-m),isigma)
+          write(*,*)'EIm(m),Fpg(-m)=',EIm(m),Fpg(-m)
+          Ftotalpg=Ftotalpg+Fpg(-m)*EIm(m)
+       endif
+    enddo
+    omegag=omegaonly
+  end subroutine SumHarmonicsg
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   real function dfdWpar(vinf,fvinf)
