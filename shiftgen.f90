@@ -39,7 +39,7 @@
 
 module shiftgen
   complex :: omegag=(1.,0.),sqm1g=(0.,1.),Ftot,dFordirect
-  complex :: omegaonly=(1.,0.) ! Gets set in SumHarmonicsg
+  complex :: omegaonly=-9999 ! Indicates uninitialized
   real :: psig=.1,Wg,zm=10.,v0,z0,z1,z2,zR,kg=0.,Omegacg=5.
   real :: vshift=0.,Tinf=1.,Tperpg=1.
   integer :: ivs,iws
@@ -221,6 +221,7 @@ contains
 ! For symmetric potentials and f(v), the returned Ftotalg can simply be
 ! doubled to give the total force since then it is symmetric in isigma.
     complex Ftotalg
+    if(omegaonly.eq.-9999)omegaonly=omegag  !Initialize if not already
     Emaxg=4.*Tinf+vshift**2
     call FgPassingEint(Ftotalpg,isigma,Emaxg)
     call FgReflectedEint(Ftotalrg,isigma)
@@ -230,46 +231,61 @@ contains
   end subroutine FgRepelEint
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   subroutine FgPassingEint(Ftp,isigma,Emaxg)
+    implicit none
     complex Ftp
+    integer :: isigma,i
+    real :: Emaxg
     logical :: lcompare=.false.
     integer, parameter :: ippow=3
+    real :: dvinf,fvinf,dfe,dfeperp,dfepre,dfeperppre
     do i=1,nge  ! Passing, corrected for psig sign.
        Wgarray(i)=max(psig,0.)+Emaxg*(i/float(nge))**ippow
        vinfarrayp(i)=-isigma*sqrt(2.*Wgarray(i))
        call Fdirect(Wgarray(i),isigma,Forcegarray(i))
-       if(i.eq.1)then  ! Start of integration
+       dfe=dfdWpar(vinfarrayp(i),fvinf) ! fparallel slope and value
+       dfeperp=-fvinf/Tperpg
+       if(i.eq.1)then  ! Start of integration approximated
           dvinf=abs(vinfarrayp(i))-sqrt(2.*max(psig,0.))
-          Ftp=Forcegarray(i)*dfdWpar(vinfarrayp(i),fvinf)&
-               &*dvinf*omegag
+          Ftp=dvinf*Forcegarray(i)*(omegag*dfe-(omegag-omegaonly)*dfeperp)
        else
           dvinf=abs(vinfarrayp(i)-vinfarrayp(i-1))
-          Ftp=Ftp+0.5*(Forcegarray(i)*dfdWpar(vinfarrayp(i),fvinf) &
-               +Forcegarray(i-1)*dfdWpar(vinfarrayp(i-1),fvinf))*dvinf*omegag
+          Ftp=Ftp+dvinf*0.5*&
+               (Forcegarray(i)*(omegag*dfe-(omegag-omegaonly)*dfeperp) &
+               +Forcegarray(i-1)*(omegag*dfepre-(omegag-omegaonly)*dfeperppre))
        endif
-       Forcegp(i)=Forcegarray(i)*omegag*dfdWpar(vinfarrayp(i),fvinf)
+       Forcegp(i)=Forcegarray(i)*(omegag*dfe-(omegag-omegaonly)*dfeperp)
        tbp(i)=taug(ngz)
        if(lcompare)call Fpasscompare(i)
+       dfepre=dfe
+       dfeperppre=dfeperp
     enddo
     Wgarrayp=Wgarray
   end subroutine FgPassingEint
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!  
   subroutine FgReflectedEint(Ftr,isigma)
-    complex Ftr
+    implicit none
+    complex :: Ftr
+    integer :: isigma,i
+    real :: dvinf,fvinf,dfe,dfeperp,dfepre,dfeperppre
     do i=1,nge  ! Reflected
        Wgarray(i)=psig*(1.-(i/float(nge))**2)
        vinfarrayr(i)=-isigma*sqrt(2.*Wgarray(i))
        call Fdirect(Wgarray(i),isigma,Forcegarray(i))
+       dfe=dfdWpar(vinfarrayp(i),fvinf) ! fparallel slope and value
+       dfeperp=-fvinf/Tperpg
        if(i.eq.1)then
           dvinf=abs(vinfarrayr(i))-sqrt(2.*psig)
-          Ftr=Forcegarray(i)*dvinf*dfdWpar(vinfarrayr(i),fvinf)*omegag
+          Ftr=dvinf*Forcegarray(i)*(omegag*dfe-(omegag-omegaonly)*dfeperp)
        else
           dvinf=abs(vinfarrayr(i)-vinfarrayr(i-1))
-          Ftr=Ftr+0.5*(Forcegarray(i) &
-               &*dfdWpar(vinfarrayr(i),fvinf) +Forcegarray(i-1) &
-               &*dfdWpar(vinfarrayr(i-1),fvinf))*dvinf*omegag
+          Ftr=Ftr+dvinf*0.5* &
+               (Forcegarray(i)*(omegag*dfe-(omegag-omegaonly)*dfeperp) &
+               +Forcegarray(i-1)*(omegag*dfepre-(omegag-omegaonly)*dfeperppre))
        endif
        Forcegr(i)=Forcegarray(i)*omegag*dfdWpar(vinfarrayr(i),fvinf)
        tbr(i)=taug(ngz)
+       dfepre=dfe
+       dfeperppre=dfeperp
     enddo
     Wgarrayr=Wgarray
   end subroutine FgReflectedEint
@@ -278,9 +294,11 @@ contains
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!  
   subroutine FgAttractEint(Ftotalg,isigma)
     complex Ftotalg
+    if(omegaonly.eq.-9999)omegaonly=omegag  !Initialize if not already
     Emaxg=4.*Tinf+vshift**2
     call FgPassingEint(Ftotalpg,isigma,Emaxg)
-    call FgTrappedEint(Ftotalrg,0.,1.,isigma) ! Hacked dfperp
+    call FgTrappedEint(Ftotalrg,-1/Tperpg,1.,isigma)
+ ! Hacked dfperpdWperp, fperp, because only Maxwellian perp distrib.    
     Ftotalpg=2.*Ftotalpg ! Because both passing v-directions not yet done.
     Ftotalg=Ftotalpg+Ftotalrg
   end subroutine FgAttractEint
@@ -292,7 +310,7 @@ contains
     complex :: Ftotal,exptb,exptbprev,cdvpsi,dob,dFdvpsig
     real :: dfperpdWperp,fperp,obi
     integer :: isigma
-    
+
     Ftotal=0.
     Wjprev=0.
     Ftotalmode=0.
@@ -319,7 +337,7 @@ contains
        ! calculate the force dFdvpsi for this vpsi and dvy element:
        call Fdirect(Wgarray(i),isigma,dFdvpsig)
        Forcegarray(i)=dFdvpsig
-       Forcegr(i)=Forcegarray(i)*omegag*dfe
+       Forcegr(i)=Forcegarray(i)*(omegag*dfe-(omegag-omegaonly)*dfeperp)
        omegabg(i)=2.*pig/(2.*taug(ngz))
        call pathshiftg(i,obi)
        omegabg(i)=omegabg(i)+sqm1g*obi
@@ -329,7 +347,7 @@ contains
        dob=omegabg(i)-omegabg(i-1)
        cdvpsi=dvpsi*(1.+sqm1g*imag(dob)/real(dob))
        ! Strictly to get dFdvpsi we need to multiply by the omega f' terms
-       Fnonresg(i)=dFdvpsig*(omegag*dfe-(omegag-omegag)*dfeperp)
+       Fnonresg(i)=dFdvpsig*(omegag*dfe-(omegag-omegaonly)*dfeperp)
        ! and correct for the imaginary shift of omegabg:
        Fnonresg(i)=Fnonresg(i)+sqm1g*real(Fnonresg(i)-Fnonresg(i-1))  &
             /real(omegabg(i)-omegabg(i-1))*obi
