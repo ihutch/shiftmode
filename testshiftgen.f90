@@ -249,7 +249,7 @@
     write(*,*)'Fpasstotal gen ',Ftotalpg
     write(*,*)'Sum mode       ',Ftraptotal+Fpasstotal
     write(*,*)'Sum gen        ',Ftotalrg+Ftotalpg
-    write(*,*)'Ftotalg        ',Ftotalg
+!    write(*,*)'Ftotalg        ',Ftotalg
   end subroutine testAttract
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   subroutine Frepelofomega
@@ -259,26 +259,30 @@
     complex, dimension(nor) :: frcomplex
     character*30 string
 !    complex :: Ftotalg
+    kg=0.
     ormax=10.   !defaults
-    oi=0.
-    psig=0.1
-    vshift=.5
+    oi=0.01
+    psig=0.01
+    vshift=0.
     isigma=-1
     Fimmobile=(128./315.)/2.       ! Now normalized *psig**2 
 ! Because frcomplex includes only one velocity direction.
     nvs=1
     call tsparse(ormax,oi,nvs)
     vsmax=vshift
-    ol=0.4
+    ol=.4
     nl=int(nor*ol/ormax)
+    write(*,*)'nl',nl
     do j=1,nvs
        if(nvs.gt.1)vshift=vsmax*(j-1.)/(nvs-1.)
        do i=1,nor
 !       or(i)=ormax*(i-1.)/(nor-1.)
           or(i)=ormax*float(i)/(nor)
           omegag=complex(or(i),oi)
+          omegaonly=omegag
           call FgRepelEint(frcomplex(i),isigma)
           frcomplex(i)=frcomplex(i)/psig**2
+!          write(*,*)omegag,frcomplex(i)
        enddo
     if(j.eq.1)then
        write(*,*)'Fimmobile/2=',Fimmobile,' Fdirect=',frcomplex(nor)
@@ -303,14 +307,34 @@
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   subroutine testSumHarm
     use shiftgen
+    use shiftmode
 !    complex :: Ftotalg
+    call tsparse(ormax,oi,nvs)
+    if(ormax.eq.0.)ormax=.1
+    omegag=complex(ormax,oi)
     write(*,*)'testSumHarm psig                  omegag,              Omegacg'
     write(*,*)psig,omegag,Omegacg
     isigma=-1
 !    call FgEint(Ftotalg,isigma)  ! Generic call is the same.
 !    write(*,*)'Ftotalg        ',Ftotalg
     call SumHarmonicsg(isigma)
-    write(*,*)'Ftotalpg=',Ftotalpg
+    write(*,*)'FtotalSumg=',Ftotalsumg
+    if(psig.lt.0)then
+       psi=-psig                     ! psi is the positive depth
+       omega=omegag
+       omegad=omega
+       Omegac=Omegacg
+       k=kg
+       write(*,*)omega,Omegac,k
+       write(*,*)'testSumHarm: Calling shiftmode initialize'
+       call initialize
+       call SumHarmonics
+       write(*,*)'Ftraptotal mode',Ftraptotal
+       write(*,*)'Fpasstotal mode',Fpasstotal
+       write(*,*)'Sum mode       ',Ftraptotal+Fpasstotal
+       write(*,*)'Sum gen        ',FtotalSumg
+       write(*,*)'SumM/SumG-1    ',(Ftraptotal+Fpasstotal)/FtotalSumg-1.
+    endif
   end subroutine testSumHarm
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   subroutine tsparse(ormax,oi,nvs)
@@ -339,10 +363,10 @@
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   integer :: nvs=1
   call tsparse(ormax,oi,nvs)
-       
+! Some tests interfere with others.       
 !  call testLofW
 !  call testFrepel
-  call testAttract
+!  call testAttract
   call testSumHarm
 !  call Frepelofomega
 end program

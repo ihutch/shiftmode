@@ -7,7 +7,7 @@ module shiftmode
 !  integer, parameter :: nx=50, ne=400, nvy=30  ! fcontko highres
 !  integer, parameter :: nx=100, ne=800, nvy=30  ! Low omegai
 !  integer, parameter :: nx=300, ne=400, nvy=30  ! Low omegai
-  integer, parameter :: nx=100, ne=200, nvy=30  ! High space resolution
+  integer, parameter :: nx=100, ne=200, nvy=50  ! High space resolution
   real, parameter :: pi=3.1415926, sq2pi=sqrt(2.*3.1415926)
   real :: psi=.1,pL=4.,k=.01, Ty=1.         ! psi, sech4width, k, Ty
   real :: xL=20.,Emax=4.,vymnorm=4.,vymax   ! Hole length, Energy, v_y
@@ -465,6 +465,7 @@ contains
     ! k, Omegac. Does the job of FpVyint, FtVyint. 
     real :: EIm(0:nvy),xit
     integer :: m,ncalc,ifirst
+    logical :: SHdebug=.true.
     data ifirst/0/
 ! How many harmonics do we need? Regard vymax as the velocity relative
 ! to the thermal perpendicular speed. But don't allow less than +-4.
@@ -492,12 +493,16 @@ contains
     omegad=omega
     call FpEint(Fpassvy(1),-1./Ty,1.)
     call FtEint(Ftrapvy(1),-1./Ty,1.)
+    if(SHdebug)write(*,'(a,e11.4,''('',2e12.4,'')'')')&
+         ' EIm(0),Ftt(0)  =',EIm(0),Fpassvy(1)+Ftrapvy(1)
     Fpasstotal=Fpassvy(1)*EIm(0)
     Ftraptotal=Ftrapvy(1)*EIm(0)
     do m=1,nharmonics
        omegad=omega+m*Omegac
        call FpEint(Fpassvy(m+1),-1./Ty,1.)
        call FtEint(Ftrapvy(m+1),-1./Ty,1.)
+       if(SHdebug)write(*,'(a,e11.4,''('',2e12.4,'')'',$)')&
+            ' EIm(m),Ftt(+-m)=',EIm(m),Fpassvy(m+1)+Ftrapvy(m+1)
        if(real(omega).eq.0)then   !Short cut.
           Fpasstotal=Fpasstotal+2*real(Fpassvy(m+1))*EIm(m)
           Ftraptotal=Ftraptotal+2*real(Ftrapvy(m+1))*EIm(m)
@@ -507,9 +512,11 @@ contains
           omegad=omega-m*Omegac
           call FpEint(Fpassvy(m+1),-1./Ty,1.)
           call FtEint(Ftrapvy(m+1),-1./Ty,1.)
+          if(SHdebug)write(*,'(''('',2e12.4,'')'')')Fpassvy(m+1)+Ftrapvy(m+1)
           Fpasstotal=Fpasstotal+Fpassvy(m+1)*EIm(m)
           Ftraptotal=Ftraptotal+Ftrapvy(m+1)*EIm(m)
        endif
+
     enddo
   end subroutine SumHarmonics
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!

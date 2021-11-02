@@ -39,18 +39,19 @@
 
 module shiftgen
   complex :: omegag=(1.,0.),sqm1g=(0.,1.),Ftot,dFordirect
-  complex :: omegaonly=-9999 ! Indicates uninitialized
+  complex :: omegadiff,omegaonly=-9999 ! Indicates uninitialized
   real :: psig=.1,Wg,zm=10.,v0,z0,z1,z2,zR,kg=0.,Omegacg=5.
   real :: vshift=0.,Tinf=1.,Tperpg=1.
   integer :: ivs,iws
   integer, parameter :: ngz=100,nge=200,nhmax=50
-  integer :: iwpowg=2,nharmonics
+  integer :: iwpowg=2,nharmonicsg
   real,parameter :: pig=3.1415926
 ! Spatial Arrays
   real, dimension(-ngz:ngz) :: zg,vg,phig,phigprime,taug
   complex, dimension(-ngz:ngz) :: Lg,CapPhig
 ! Parallel energy arrays
-  complex :: omegabg(0:nge),Forcegarray(nge),Forcegp(nge),Forcegr(nge)
+  complex :: omegabg(0:nge)
+  complex, dimension(nge) :: Forcegarray,Forcegp,Forcegr,Forcegt
   real :: Wgarray(nge),Wgarrayp(nge),Wgarrayr(nge),vinfarrayp(nge)&
        &,vinfarrayr(nge),tbr(nge),tbp(nge),Wgarrayu(nge)
   complex :: Fnonresg(0:nge),Ftrapg(0:nge)
@@ -58,7 +59,7 @@ module shiftgen
   complex, dimension(-nhmax:nhmax) :: Frg,Ftg,Fpg
 ! Total forces
   complex :: Ftotalmode
-  complex :: Ftotalrg,Ftotalpg
+  complex :: Ftotalrg,Ftotalpg,Ftotalsumg
 contains
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   subroutine makezg(isigma)
@@ -143,8 +144,6 @@ contains
        endif
     enddo
   end subroutine orbitendg
-!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  include 'LofW.f90'    ! Obsolete; only for testing.
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   subroutine Fdirect(Wgi,isigma,dForceg)
 ! Calculate the past integral of tau and force 
@@ -238,6 +237,7 @@ contains
     logical :: lcompare=.false.
     integer, parameter :: ippow=3
     real :: dvinf,fvinf,dfe,dfeperp,dfepre,dfeperppre
+    omegadiff=omegag-omegaonly
     do i=1,nge  ! Passing, corrected for psig sign.
        Wgarray(i)=max(psig,0.)+Emaxg*(i/float(nge))**ippow
        vinfarrayp(i)=-isigma*sqrt(2.*Wgarray(i))
@@ -246,14 +246,14 @@ contains
        dfeperp=-fvinf/Tperpg
        if(i.eq.1)then  ! Start of integration approximated
           dvinf=abs(vinfarrayp(i))-sqrt(2.*max(psig,0.))
-          Ftp=dvinf*Forcegarray(i)*(omegag*dfe-(omegag-omegaonly)*dfeperp)
+          Ftp=dvinf*Forcegarray(i)*(omegag*dfe-omegadiff*dfeperp)
        else
           dvinf=abs(vinfarrayp(i)-vinfarrayp(i-1))
           Ftp=Ftp+dvinf*0.5*&
-               (Forcegarray(i)*(omegag*dfe-(omegag-omegaonly)*dfeperp) &
-               +Forcegarray(i-1)*(omegag*dfepre-(omegag-omegaonly)*dfeperppre))
+               (Forcegarray(i)*(omegag*dfe-omegadiff*dfeperp) &
+               +Forcegarray(i-1)*(omegag*dfepre-omegadiff*dfeperppre))
        endif
-       Forcegp(i)=Forcegarray(i)*(omegag*dfe-(omegag-omegaonly)*dfeperp)
+       Forcegp(i)=Forcegarray(i)*(omegag*dfe-omegadiff*dfeperp)
        tbp(i)=taug(ngz)
        if(lcompare)call Fpasscompare(i)
        dfepre=dfe
@@ -267,6 +267,7 @@ contains
     complex :: Ftr
     integer :: isigma,i
     real :: dvinf,fvinf,dfe,dfeperp,dfepre,dfeperppre
+    omegadiff=omegag-omegaonly
     do i=1,nge  ! Reflected
        Wgarray(i)=psig*(1.-(i/float(nge))**2)
        vinfarrayr(i)=-isigma*sqrt(2.*Wgarray(i))
@@ -275,12 +276,12 @@ contains
        dfeperp=-fvinf/Tperpg
        if(i.eq.1)then
           dvinf=abs(vinfarrayr(i))-sqrt(2.*psig)
-          Ftr=dvinf*Forcegarray(i)*(omegag*dfe-(omegag-omegaonly)*dfeperp)
+          Ftr=dvinf*Forcegarray(i)*(omegag*dfe-omegadiff*dfeperp)
        else
           dvinf=abs(vinfarrayr(i)-vinfarrayr(i-1))
           Ftr=Ftr+dvinf*0.5* &
-               (Forcegarray(i)*(omegag*dfe-(omegag-omegaonly)*dfeperp) &
-               +Forcegarray(i-1)*(omegag*dfepre-(omegag-omegaonly)*dfeperppre))
+               (Forcegarray(i)*(omegag*dfe-omegadiff*dfeperp) &
+               +Forcegarray(i-1)*(omegag*dfepre-omegadiff*dfeperppre))
        endif
        Forcegr(i)=Forcegarray(i)*omegag*dfdWpar(vinfarrayr(i),fvinf)
        tbr(i)=taug(ngz)
@@ -301,6 +302,7 @@ contains
  ! Hacked dfperpdWperp, fperp, because only Maxwellian perp distrib.    
     Ftotalpg=2.*Ftotalpg ! Because both passing v-directions not yet done.
     Ftotalg=Ftotalpg+Ftotalrg
+!    write(*,*)'Fs',Ftotalpg,Ftotalrg
   end subroutine FgAttractEint
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!  
   subroutine FgTrappedEint(Ftotal,dfperpdWperp,fperp,isigma)
@@ -311,6 +313,7 @@ contains
     real :: dfperpdWperp,fperp,obi
     integer :: isigma
 
+    omegadiff=omegag-omegaonly
     Ftotal=0.
     Wjprev=0.
     Ftotalmode=0.
@@ -337,7 +340,7 @@ contains
        ! calculate the force dFdvpsi for this vpsi and dvy element:
        call Fdirect(Wgarray(i),isigma,dFdvpsig)
        Forcegarray(i)=dFdvpsig
-       Forcegr(i)=Forcegarray(i)*(omegag*dfe-(omegag-omegaonly)*dfeperp)
+       Forcegr(i)=Forcegarray(i)*(omegag*dfe-omegadiff*dfeperp)
        omegabg(i)=2.*pig/(2.*taug(ngz))
        call pathshiftg(i,obi)
        omegabg(i)=omegabg(i)+sqm1g*obi
@@ -347,7 +350,7 @@ contains
        dob=omegabg(i)-omegabg(i-1)
        cdvpsi=dvpsi*(1.+sqm1g*imag(dob)/real(dob))
        ! Strictly to get dFdvpsi we need to multiply by the omega f' terms
-       Fnonresg(i)=dFdvpsig*(omegag*dfe-(omegag-omegaonly)*dfeperp)
+       Fnonresg(i)=dFdvpsig*(omegag*dfe-omegadiff*dfeperp)
        ! and correct for the imaginary shift of omegabg:
        Fnonresg(i)=Fnonresg(i)+sqm1g*real(Fnonresg(i)-Fnonresg(i-1))  &
             /real(omegabg(i)-omegabg(i-1))*obi
@@ -404,45 +407,46 @@ contains
     implicit none
     integer :: isigma
     ! Sum harmonic contributions to obtain Forces for specified
-    ! k, Omegacg. Does the job v-perp integration. 
+    ! kg, Omegacg. Does the job of v-perp integration. 
     real :: EIm(0:nhmax),xit,vymax,hnum
     integer :: m,ncalc
     real :: Oceff   ! The effective Omegacg
-! The maximum needed perp velocity, such that kg*vymax/Oc=nharmonics
+! The maximum needed perp velocity, such that kg*vymax/Oc=nharmonicsg
     vymax=3.5*sqrt(2.*Tperpg)
-    Oceff=max(Omegacg,kg*vymax/nhmax) ! Don't allow zero Oceff.
+    Oceff=max(1.e-6,max(Omegacg,kg*vymax/nhmax)) ! Don't allow zero Oceff.
 ! How many harmonics do we actually need? Nominally:
     hnum=kg*vymax/Oceff
-! If nharmonics is small, then use rather more for accuracy.
-    nharmonics=min(nhmax,int(hnum*(1.+3./(hnum+1.))))
+! If nharmonicsg is small, then use rather more for accuracy.
+    nharmonicsg=min(nhmax,int(hnum*(1.+3./(hnum+1.))))
     xit=kg*sqrt(Tperpg)/Oceff
-    write(*,*)vymax,hnum,xit
-! Calculate the Integer[0.] exp*I[2] Bessel functions 0 to nharmonics
-    call RIBESL(xit**2,0.,nharmonics+1,2,EIm,ncalc)
-    if(.not.ncalc.eq.nharmonics+1)then ! All orders not calculated correctly.  
-       write(*,'(a,i3,a,i3,a)')'Bessel functions',ncalc,' of',nharmonics+1, &
+!    write(*,*)vymax,hnum,xit
+! Calculate the Integer[0.] exp*I[2] Bessel functions 0 to nharmonicsg
+    call RIBESL(xit**2,0.,nharmonicsg+1,2,EIm,ncalc)
+    if(.not.ncalc.eq.nharmonicsg+1)then ! All orders not calculated correctly.  
+       write(*,'(a,i3,a,i3,a)')'Bessel functions',ncalc,' of',nharmonicsg+1, &
        ' are precise. Others may be irrelevant.' 
     endif
 ! m=0 always used.! fy is Maxwellian.
 ! But the fywy,fy need to be fixed in inner routines.
     omegaonly=omegag
     call FgEint(Fpg(0),isigma)
-    write(*,*)'SumHarmonicsg: Oceff,nharmonics=',Oceff,nharmonics
-    write(*,*)'EIm(0),Fpg(0)=',EIm(0),Fpg(0)
-    Ftotalpg=Fpg(0)*EIm(0)
-    do m=1,nharmonics
+    write(*,*)'SumHarmonicsg: Oceff,nharmonicsg=',Oceff,nharmonicsg !,hnum
+    write(*,'(a,e11.4,''('',2e12.4,'')'')')&
+         ' EIm(0),Ftt(0)  =',EIm(0),Fpg(0)
+    Ftotalsumg=Fpg(0)*EIm(0)
+    do m=1,nharmonicsg
        omegag=omegaonly+m*Oceff
        call FgEint(Fpg(m),isigma)
-       write(*,*)'EIm(m),Fpg(m)=',EIm(m),Fpg(m)
        if(real(omegaonly).eq.0)then   !Short cut.
-          Ftotalpg=Ftotalpg+2*real(Fpg(m))*EIm(m)
+          Ftotalsumg=Ftotalsumg+2*real(Fpg(m))*EIm(m)
        else      ! Full sum over plus and minus m.
-          Ftotalpg=Ftotalpg+Fpg(m)*EIm(m)
+          Ftotalsumg=Ftotalsumg+Fpg(m)*EIm(m)
           omegag=omegaonly-m*Oceff
           call FgEint(Fpg(-m),isigma)
-          write(*,*)'EIm(m),Fpg(-m)=',EIm(m),Fpg(-m)
-          Ftotalpg=Ftotalpg+Fpg(-m)*EIm(m)
+          Ftotalsumg=Ftotalsumg+Fpg(-m)*EIm(m)
        endif
+       write(*,'(a,e11.4,''('',2e12.4,'')('',2e12.4,'')'')')&
+            ' EIm(m),Fpg(+-m)=',EIm(m),Fpg(m),Fpg(-m)
     enddo
     omegag=omegaonly
   end subroutine SumHarmonicsg
@@ -527,6 +531,8 @@ contains
       IF (X.LT.0.) expERFCC=2.*exp(z**2)-expERFCC
       END
 !********************************************************************
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  include 'LofW.f90'    ! Obsolete; only for testing.
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 end module shiftgen
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
