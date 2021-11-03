@@ -197,19 +197,19 @@ contains
        dForceg=dForceg-sqm1g*&
             0.5*(CapPhig(i)*phigprime(i)+CapPhig(i-1)*phigprime(i-1))&
             *abs(vpsig*dtau)
-!       write(*,'(a,i4,8f10.5)')'CapPhiStep',i,taug(i),zg(i),CapPhig(i),dForceg
     enddo
     if(Wg.lt.0)then     ! Trapped orbit. Add resonant term. 
        exptbb2=exp(sqm1g*omegag*taug(ngz))
-! This form is to be divided by (1-exptb) full resonant denominator.
-! But it would probably be better to remove a (1.-exptbb2**2) factor and
-! Divide only the resonant term by (1.+exptbb2) later.
        vpsig=abs(vg(0))
+! This form is to be divided by (1-exptb) full resonant denominator.
        dForceg=dForceg*(1.-exptbb2**2) &
             + sqm1g*CapPhig(ngz)**2*(1.-exptbb2)*vpsig
-! In shiftmode the division by the resonant denominator is done
-! outside the routine because it involves complicated negotiation of
-! the resonance to preserve accuracy for trapped particles. 
+! But it would probably be better to remove a (1.-exptbb2) factor and
+! Divide only the resonant term by (1.+exptbb2) later Half Period:
+!       dForceg=dForceg*(1.+exptbb2) + sqm1g*CapPhig(ngz)**2*vpsig
+! The division by the resonant denominator is done outside the routine
+! because it involves complicated negotiation of the resonance to
+! preserve accuracy for trapped particles.
     endif
   end subroutine Fdirect
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!  
@@ -308,7 +308,7 @@ contains
     logical :: lcompare=.false.  ! Make True Only if using shiftmode
     ! Integrate over fe (trapped). Wj=vpsi^2/2-psi. So vpsi=sqrt(2(psi+Wj))
     ! Wj range 0 to -psi.
-    complex :: Ftotal,exptb,exptbprev,cdvpsi,dob,dFdvpsig
+    complex :: Ftotal,exptb,cdvpsi,dob,dFdvpsig,resdenom,resdprev
     real :: dfperpdWperp,fperp,obi
     integer :: isigma
 
@@ -323,29 +323,30 @@ contains
     vpsiprev=sqrt(-2.*psig)
     omegabg(0)=0.
     Fnonresg(0)=0.                !Don't add zero energy point.
-    exptbprev=0.                  !Silence warnings
+    resdprev=1.
     do i=1,nge-1       ! Trapped
        Wgarray(i)=psig*((float(i)/nge)**iwpowg)
        Wj=Wgarray(i)
-       ! New exact sech^4 hole form.
        sqWj=sqrt(-Wj)
        fe=((2./pig)*sqWj+(15./16.)*Wj/sqrt(-psig)+experfcc(sqWj)&
-            /sqrt(pig))/sqrt(2.)
+            /sqrt(pig))/sqrt(2.)        ! New exact sech^4 hole form.
        dfe=((15./16.)/sqrt(-psig)-experfcc(sqWj)/sqrt(pig))/sqrt(2.)*fperp
        dfeperp=fe*dfperpdWperp      ! df/dW_perp
        vpsi=sqrt(2.*(-psig+Wj))
        vinfarrayr(i)=vpsi ! reflected==trapped for attracting hill.
        dvpsi=vpsiprev-vpsi
-       ! calculate the force dFdvpsi for this vpsi and dvy element:
+! Calculate the force dFdvpsi for this vpsi and dvy element for one transit:
        call Fdirect(Wgarray(i),isigma,dFdvpsig)
        Forcegarray(i)=dFdvpsig
        Forcegr(i)=Forcegarray(i)*(omegag*dfe-omegadiff*dfeperp)
        omegabg(i)=2.*pig/(2.*taug(ngz))
        call pathshiftg(i,obi)
        omegabg(i)=omegabg(i)+sqm1g*obi
-       exptb=exp(sqm1g*omegag*2*pig/omegabg(i))
+       exptb=exp(sqm1g*omegag*pig/omegabg(i))   ! Half period
        if(.not.abs(exptb).lt.1.e10)exptb=1.e10  ! Enable divide by infinity
-       if(i.eq.1)exptbprev=exptb
+       resdenom=1.-exptb**2                        !Full period version
+!       resdenom=1.+exptb                        ! Half period version
+       if(i.eq.1)resdprev=resdenom
        dob=omegabg(i)-omegabg(i-1)
        cdvpsi=dvpsi*(1.+sqm1g*imag(dob)/real(dob))
        ! Strictly to get dFdvpsi we need to multiply by the omega f' terms
@@ -357,9 +358,8 @@ contains
           write(*,*)'Drop',taug(ngz),imag(omegag),dFdvpsig
           Fnonresg(i)=0. 
        endif
-       ! Then multiply by the resonance factor and the complex dvpsi and sum.
-       Ftrapg(i)=0.5*(Fnonresg(i)/(1.-exptb) &
-            +Fnonresg(i-1)/(1.-exptbprev))*cdvpsi
+! Then divide by the resonance denominator multiply by complex dvpsi and sum.
+       Ftrapg(i)=0.5*(Fnonresg(i)/resdenom + Fnonresg(i-1)/resdprev)*cdvpsi
     ! Now Ftrapg(i) is a quantity when simply summed over all ne positions
     ! and multiplied by 2 gives the total force. 
        if(.not.(abs(Ftrapg(i)).ge.0))then
@@ -367,21 +367,21 @@ contains
           write(*,*)Fnonresg(i),Ftrapg(i)
           write(*,*)omegabg(i-1),omegabg(i)
           write(*,*)omegag,omegag/omegabg(i)
-          write(*,*)exptb,exptbprev
+          write(*,*)resdenom,resdprev
           write(*,*)dvpsi,vpsi,vpsiprev,Wj
           write(*,*)fe,dfe,dfeperp
           stop
        endif
        ! Multiply by 2. to account for \pm v_\psi.
        Ftotal=Ftotal+2.*Ftrapg(i)       ! Add to Ftotal integral.
-       if(lcompare)call  Ftrapcompare(i,dfe,dfeperp,obi,exptb&
-            &,exptbprev,cdvpsi,Ftotal,dFdvpsig,vpsi)
+       if(lcompare)call  Ftrapcompare(i,dfe,dfeperp,obi,resdenom&
+            &,resdprev,cdvpsi,Ftotal,dFdvpsig,vpsi)
        vpsiprev=vpsi
        feprev=fe
 !       dFdvprev=dFdvpsi
        dfeprev=dfe
        dfeperpprev=dfeperp
-       exptbprev=exptb
+       resdprev=resdenom
     enddo
     ! Calculate end by extrapolation.
     Ftrapg(nge)=Ftrapg(nge-1)+0.5*(Ftrapg(nge-1)-Ftrapg(nge-2))
@@ -389,8 +389,8 @@ contains
     Ftotal=Ftotal+2.*Ftrapg(nge)
     Wgarray(nge)=psig
     Wgarrayr=Wgarray
-    if(lcompare)call  Ftrapcompare(i,dfe,dfeperp,obi,exptb&
-         &,exptbprev,cdvpsi,Ftotal,dFdvpsig,vpsi)
+    if(lcompare)call  Ftrapcompare(i,dfe,dfeperp,obi,resdenom&
+         &,resdprev,cdvpsi,Ftotal,dFdvpsig,vpsi)
   end subroutine FgTrappedEint
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   subroutine FgEint(Ftotalg,isigma)
