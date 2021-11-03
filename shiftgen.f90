@@ -107,7 +107,8 @@ contains
           phigprime(-i)=ivs*phigprime(i)
        endif
        if(.not.phigprime(i).lt.1.e20)then
-          write(*,*)'phigprime NAN',i,phigprime(i),zg(i),z1,z2,zi,zR,gK,Wg,isigma
+          write(*,*)'phigprime NAN',i,phigprime(i),zg(i),z1,z2,zi,zR,&
+               gK,Wg,isigma
           stop
        endif
     enddo
@@ -224,8 +225,6 @@ contains
     Emaxg=4.*Tinf+vshift**2
     call FgPassingEint(Ftotalpg,isigma,Emaxg)
     call FgReflectedEint(Ftotalrg,isigma)
-!    write(*,'(i3,6f10.4)')50,vinfarrayr(50),Forcegarray(50),Forcegr(50)&
-!         ,dfdWpar(vinfarrayr(50),fvinv)
     Ftotalg=Ftotalpg+Ftotalrg
   end subroutine FgRepelEint
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -369,7 +368,8 @@ contains
           write(*,*)omegabg(i-1),omegabg(i)
           write(*,*)omegag,omegag/omegabg(i)
           write(*,*)exptb,exptbprev
-          write(*,*)dvpsi,vpsi,vpsiprev
+          write(*,*)dvpsi,vpsi,vpsiprev,Wj
+          write(*,*)fe,dfe,dfeperp
           stop
        endif
        ! Multiply by 2. to account for \pm v_\psi.
@@ -430,18 +430,20 @@ contains
 ! But the fywy,fy need to be fixed in inner routines.
     omegaonly=omegag
     call FgEint(Fpg(0),isigma)
-    write(*,*)'SumHarmonicsg: Oceff,nharmonicsg=',Oceff,nharmonicsg !,hnum
-    write(*,'(a,e11.4,''('',2e12.4,'')'')')&
-         ' EIm(0),Ftt(0)  =',EIm(0),Fpg(0)
+!    write(*,*)'SumHarmonicsg: Oceff,nharmonicsg=',Oceff,nharmonicsg !,hnum
+    write(*,'(a,e11.4,''('',2e12.4,'')'',i4)')&
+         ' EIm(0),Ftt(0)  =',EIm(0),Fpg(0),nharmonicsg
     Ftotalsumg=Fpg(0)*EIm(0)
     do m=1,nharmonicsg
        omegag=omegaonly+m*Oceff
+       if(abs(omegag).lt.1.e-5)omegag=omegag+sqm1g*1.e-5 ! Prevent zero.
        call FgEint(Fpg(m),isigma)
        if(real(omegaonly).eq.0)then   !Short cut.
           Ftotalsumg=Ftotalsumg+2*real(Fpg(m))*EIm(m)
        else      ! Full sum over plus and minus m.
           Ftotalsumg=Ftotalsumg+Fpg(m)*EIm(m)
           omegag=omegaonly-m*Oceff
+          if(abs(omegag).lt.1.e-5)omegag=omegag+sqm1g*1.e-5
           call FgEint(Fpg(-m),isigma)
           Ftotalsumg=Ftotalsumg+Fpg(-m)*EIm(m)
        endif

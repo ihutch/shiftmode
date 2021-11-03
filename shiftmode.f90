@@ -465,7 +465,7 @@ contains
     ! k, Omegac. Does the job of FpVyint, FtVyint. 
     real :: EIm(0:nvy),xit
     integer :: m,ncalc,ifirst
-    logical :: SHdebug=.true.
+    logical :: SHdebug=.false.
     data ifirst/0/
 ! How many harmonics do we need? Regard vymax as the velocity relative
 ! to the thermal perpendicular speed. But don't allow less than +-4.

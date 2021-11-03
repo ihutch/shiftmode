@@ -13,6 +13,7 @@
     logical :: lplotmz=.true.
     ones=1.
     omegag=(5.,0.02)
+    omegaonly=omegag
     psig=-.5
     omegad=omegag
     psi=abs(psig)
@@ -139,6 +140,7 @@
     complex :: Ftotalg
     character*40 annote
     omegag=(.1,0.00000)
+    omegaonly=omegag
     psig=.5
     isigma=-1    
     vshift=1.
@@ -192,6 +194,7 @@
     complex :: Ftotalg
     character*40 annote
     omegag=(.1,0.001000)
+    omegaonly=omegag
     psig=-.5
     isigma=-1    
     vshift=0.
@@ -269,10 +272,10 @@
 ! Because frcomplex includes only one velocity direction.
     nvs=1
     call tsparse(ormax,oi,nvs)
+    psig=abs(psig)
     vsmax=vshift
     ol=.4
-    nl=int(nor*ol/ormax)
-    write(*,*)'nl',nl
+    nl=int(nor*min(ol/ormax,1.))
     do j=1,nvs
        if(nvs.gt.1)vshift=vsmax*(j-1.)/(nvs-1.)
        do i=1,nor
@@ -281,6 +284,11 @@
           omegag=complex(or(i),oi)
           omegaonly=omegag
           call FgRepelEint(frcomplex(i),isigma)
+          if(.not.real(frcomplex(i)).lt.1.e20)then
+             write(*,*)'Frepelofomega Force Nan?',&
+                  i,omegag,omegaonly,frcomplex(i),psig,isigma
+             stop
+          endif
           frcomplex(i)=frcomplex(i)/psig**2
 !          write(*,*)omegag,frcomplex(i)
        enddo
@@ -311,7 +319,9 @@
 !    complex :: Ftotalg
     call tsparse(ormax,oi,nvs)
     if(ormax.eq.0.)ormax=.1
+    if(oi.lt.0.00001)oi=.00001
     omegag=complex(ormax,oi)
+    omegaonly=omegag
     write(*,*)'testSumHarm psig                  omegag,              Omegacg'
     write(*,*)psig,omegag,Omegacg
     isigma=-1
@@ -366,7 +376,7 @@
 ! Some tests interfere with others.       
 !  call testLofW
 !  call testFrepel
-!  call testAttract
+  call testAttract
   call testSumHarm
-!  call Frepelofomega
+  call Frepelofomega
 end program
