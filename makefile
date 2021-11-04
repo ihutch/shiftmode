@@ -7,7 +7,7 @@ include ACCIS.mk
 #########################################################################
 LIBRARIES := $(LIBRARIES) -lmodbess
 LIBDEPS := $(LIBDEPS) libmodbess.a
-COMPILE-SWITCHES:=$(COMPILE-SWITCHES) -Wno-unused-dummy-argument
+COMPILE-SWITCHES:=$(COMPILE-SWITCHES) -Wno-unused-dummy-argument -fopenmp
 #########################################################################
 MODULES=shiftmode.o shiftgen.o acpath.o 
 #########################################################################

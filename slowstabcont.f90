@@ -107,7 +107,7 @@ subroutine fomegacont(psip,Omegacp,Typ,kp,vsin,lcont,lplot,err,omegap&
   read(12,end=100)lions
   close(12)
 100  lreadit=.true.
-  write(*,*)'Read forcecomplex from file'
+  write(*,*)'Read forcecomplex from file ',filename
   goto 102
 101 write(*,*)'Failed to open or read from file: ', filename
 102 continue
@@ -151,7 +151,7 @@ subroutine fomegacont(psip,Omegacp,Typ,kp,vsin,lcont,lplot,err,omegap&
               forcecomplex(ior,ioi)=Fpasstotal+Ftraptotal+Fi
               write(*,'(2i4,8f8.4)')ior,ioi,omega,Fpasstotal,Ftraptotal &
                    ,forcecomplex(ior,ioi)
-           enddo
+           enddo 
         enddo
 
         ! Attempt to write but skip if file exists.

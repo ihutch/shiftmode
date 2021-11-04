@@ -316,9 +316,8 @@ contains
     Ftotal=0.
     Wjprev=0.
     Ftotalmode=0.
-! Zeroth step values. New exact analytic
-    feprev=1/sqrt(2.*pig)
-    dfeprev=(15./(16.*sqrt(-2.*psig))-1./sqrt(2.*pig))*fperp
+! Functionalized
+    dfe=dfdWptrap(0.,feprev)*fperp
     dfeperpprev=feprev*dfperpdWperp
     vpsiprev=sqrt(-2.*psig)
     omegabg(0)=0.
@@ -327,10 +326,8 @@ contains
     do i=1,nge-1       ! Trapped
        Wgarray(i)=psig*((float(i)/nge)**iwpowg)
        Wj=Wgarray(i)
-       sqWj=sqrt(-Wj)
-       fe=((2./pig)*sqWj+(15./16.)*Wj/sqrt(-psig)+experfcc(sqWj)&
-            /sqrt(pig))/sqrt(2.)        ! New exact sech^4 hole form.
-       dfe=((15./16.)/sqrt(-psig)-experfcc(sqWj)/sqrt(pig))/sqrt(2.)*fperp
+! Functionalized version.
+       dfe=dfdWptrap(Wj,fe)*fperp
        dfeperp=fe*dfperpdWperp      ! df/dW_perp
        vpsi=sqrt(2.*(-psig+Wj))
        vinfarrayr(i)=vpsi ! reflected==trapped for attracting hill.
@@ -378,7 +375,6 @@ contains
             &,resdprev,cdvpsi,Ftotal,dFdvpsig,vpsi)
        vpsiprev=vpsi
        feprev=fe
-!       dFdvprev=dFdvpsi
        dfeprev=dfe
        dfeperpprev=dfeperp
        resdprev=resdenom
@@ -477,6 +473,15 @@ contains
   real function phigprimeofz(zval)
     phigprimeofz=-psig*sinh(zval/4.)/cosh(zval/4.)**5
   end function phigprimeofz
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  real function dfdWptrap(Wj,fe)
+! Return the energy derivative and the parallel distribution function
+! This simple version ignores charge contribution from repelled species.
+    sqWj=sqrt(-Wj)
+    fe=((2./pig)*sqWj+(15./16.)*Wj/sqrt(-psig)+experfcc(sqWj)&
+       /sqrt(pig))/sqrt(2.)        ! New exact sech^4 hole form.
+    dfdWptrap=((15./16.)/sqrt(-psig)-experfcc(sqWj)/sqrt(pig))/sqrt(2.)
+end function dfdWptrap
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   subroutine fvinfplot
 ! vshift, Tinf, defined in module shiftgen,     

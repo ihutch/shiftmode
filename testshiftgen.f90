@@ -317,8 +317,9 @@
     use shiftgen
     use shiftmode
 !    complex :: Ftotalg
+    ormax=.1
+    psig=-.1
     call tsparse(ormax,oi,nvs)
-    if(ormax.eq.0.)ormax=.1
     if(oi.lt.0.00001)oi=.00001
     omegag=complex(ormax,oi)
     omegaonly=omegag
