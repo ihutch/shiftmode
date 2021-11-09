@@ -39,7 +39,7 @@
 
 module shiftgen
   complex :: omegag=(1.,0.),sqm1g=(0.,1.),Ftot,dFordirect
-  complex :: omegadiff,omegaonly=-9999 ! Indicates uninitialized
+  complex :: omegadiff,omegaonly
   real :: psig=.1,Wg,zm=10.,v0,z0,z1,z2,zR,kg=0.,Omegacg=5.
   real :: vshift=0.,Tinf=1.,Tperpg=1.
   integer :: ivs,iws
@@ -221,7 +221,12 @@ contains
 ! For symmetric potentials and f(v), the returned Ftotalg can simply be
 ! doubled to give the total force since then it is symmetric in isigma.
     complex Ftotalg
-    if(omegaonly.eq.-9999)omegaonly=omegag  !Initialize if not already
+    integer, save :: idone=0
+    if(idone.eq.0.and.abs(omegaonly-omegag).gt.1.e-6)then
+       write(*,*)'WARNING: omegaonly and omegag are unequal.'
+       write(*,*)omegaonly,omegag
+       idone=idone+1
+    endif
     Emaxg=4.*Tinf+vshift**2
     call FgPassingEint(Ftotalpg,isigma,Emaxg)
     call FgReflectedEint(Ftotalrg,isigma)
@@ -294,7 +299,12 @@ contains
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!  
   subroutine FgAttractEint(Ftotalg,isigma)
     complex Ftotalg
-    if(omegaonly.eq.-9999)omegaonly=omegag  !Initialize if not already
+    integer, save :: idone=0
+    if(idone.eq.0.and.abs(omegaonly-omegag).gt.1.e-6)then
+       write(*,*)'WARNING: omegaonly and omegag are unequal.'
+       write(*,*)omegaonly,omegag
+       idone=idone+1
+    endif
     Emaxg=4.*Tinf+vshift**2
     call FgPassingEint(Ftotalpg,isigma,Emaxg)
     call FgTrappedEint(Ftotalrg,-1/Tperpg,1.,isigma)
@@ -316,8 +326,7 @@ contains
     Ftotal=0.
     Wjprev=0.
     Ftotalmode=0.
-! Functionalized
-    dfe=dfdWptrap(0.,feprev)*fperp
+    dfe=dfdWptrap(Wjprev,feprev)*fperp
     dfeperpprev=feprev*dfperpdWperp
     vpsiprev=sqrt(-2.*psig)
     omegabg(0)=0.

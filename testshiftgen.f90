@@ -259,7 +259,7 @@
     use shiftgen
     integer, parameter :: nor=100
     real, dimension(nor) :: or
-    complex, dimension(nor) :: frcomplex
+    complex, dimension(nor) :: frcomplex,fion
     character*30 string
 !    complex :: Ftotalg
     kg=0.
@@ -289,26 +289,31 @@
                   i,omegag,omegaonly,frcomplex(i),psig,isigma
              stop
           endif
+! Test of ionforce
+          call ionforce(fion(i),omegag/sqrt(1836.),omegag/sqrt(1836.),psig,0.,1836.)
+          fion(i)=fion(i)/psig**2/2.
           frcomplex(i)=frcomplex(i)/psig**2
-!          write(*,*)omegag,frcomplex(i)
+          diffmax=max(diffmax,abs(fion(i)-frcomplex(i)))
        enddo
-    if(j.eq.1)then
-       write(*,*)'Fimmobile/2=',Fimmobile,' Fdirect=',frcomplex(nor)
-       call pltinit(0.,or(nor),-0.8*Fimmobile,1.2*Fimmobile)
-       call axis; call axis2
-       call axlabels('real(!Aw!@)/!Aw!@!dpi!d','Force/!Ay!@!u2!u')
-       call polymark(ormax,Fimmobile,1,1)
-    endif
-    call color(mod(j-1,15)+1)
-    call polyline(or,real(frcomplex),nor)
-    call fwrite(vshift,iwidth,2,string)
-    call jdrwstr(wx2nx(ormax*.95),wy2ny(real(frcomplex(nor))),string(1:iwidth),-1.)
-    call jdrwstr(wx2nx(ol),wy2ny(imag(frcomplex(nl))),string(1:iwidth),0.)
-    if(j.eq.1)call legendline(.5,.1,0,' real')
-    call dashset(2)
-    call polyline(or,imag(frcomplex),nor)
-    if(j.eq.1)call legendline(.5,.15,0,' imag')
-    call dashset(0)
+       write(*,*)'diffmax=',diffmax
+       if(j.eq.1)then
+          write(*,*)'Fimmobile/2=',Fimmobile,' Fdirect=',frcomplex(nor)
+          write(*,'(a,f9.5,a,f9.5)')' vshift=',vshift,' psig=',psig
+          call pltinit(0.,or(nor),-0.8*Fimmobile,1.2*Fimmobile)
+          call axis; call axis2
+          call axlabels('real(!Aw!@)/!Aw!@!dpi!d','Force/!Ay!@!u2!u')
+          call polymark(ormax,Fimmobile,1,1)
+       endif
+       call color(mod(j-1,15)+1)
+       call polyline(or,real(frcomplex),nor)
+       call fwrite(vshift,iwidth,2,string)
+       call jdrwstr(wx2nx(ormax*.95),wy2ny(real(frcomplex(nor))),string(1:iwidth),-1.)
+       call jdrwstr(wx2nx(ol),wy2ny(imag(frcomplex(nl))),string(1:iwidth),0.)
+       if(j.eq.1)call legendline(.5,.1,0,' real')
+       call dashset(2)
+       call polyline(or,imag(frcomplex),nor)
+       if(j.eq.1)call legendline(.5,.15,0,' imag')
+       call dashset(0)
     enddo
     call pltend
   end subroutine Frepelofomega
@@ -374,10 +379,50 @@
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   integer :: nvs=1
   call tsparse(ormax,oi,nvs)
-! Some tests interfere with others.       
-!  call testLofW
-!  call testFrepel
+! Some tests might interfere with others.       
+  call testLofW
+  call testFrepel
   call testAttract
   call testSumHarm
   call Frepelofomega
+  call plotionforce(.01,1.,0.)
 end program
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+subroutine ionforce(Fi,omega,omegaon,psiin,vsin,mime)
+! Calculate ion force for given parameters and ion to electron mass mime.
+  use shiftgen
+  complex :: Fi,omega,Ftotalg,omegaon
+  real :: psiin,vsin,mime
+  omegag=omega*sqrt(mime)
+  omegaonly=omegaon*sqrt(mime)
+  psig=psiin
+  isigma=-1
+  vshift=vsin
+  call FgRepelEint(Ftotalg,isigma)
+  Fi=2.*Ftotalg
+  if(abs(real(omegag)-nint(real(omegag))).lt.1.e-5)then ! Debugging.
+     write(*,*)omegag,Ftotalg
+  endif
+end subroutine ionforce
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+subroutine plotionforce(psi,Typ,vsin)
+  real :: psi,Typ,vsin
+  integer, parameter :: nfi=100
+  complex :: omegaon
+  complex, dimension(nfi) :: Fiarray,omegaFi
+  omegamax=10
+  write(*,*)'psi=',psi,' vsin=',vsin
+  do i=1,nfi
+     omegaFi(i)=omegamax*(float(i)/nfi)/sqrt(1836.)+complex(0.,.01)/sqrt(1836.)
+     omegaon=omegaFi(i)
+     call ionforce(Fiarray(i),omegaFi(i),omegaon,psi,vsin,1836.)
+     Fiarray(i)=Fiarray(i)/psi
+  enddo
+  call minmax(Fiarray,2*nfi,fmin,fmax)
+  call pltinit(0.,omegamax/sqrt(1836.),fmin,fmax)
+  call axis
+  call axlabels('omega','Fi')
+  call polyline(real(omegaFi),real(Fiarray),nfi)
+  call polyline(real(omegaFi),imag(Fiarray),nfi)
+  call pltend
+end subroutine plotionforce

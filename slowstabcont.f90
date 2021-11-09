@@ -44,18 +44,22 @@ program fomegasolve
              &,omegap,ormax,oimax)
      enddo
   enddo
+  call plotionforce(psip,Typ,vsin)
 end program fomegasolve
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 subroutine parsefoarguments(psip,vsin,ormax,oimax)
   character*20 argument
+  ipfset=3 ! default
   do i=1,iargc()
      call getarg(i,argument)
      if(argument(1:2).eq.'-p')read(argument(3:),*)psip
      if(argument(1:3).eq.'-vs')read(argument(4:),*)vsin
      if(argument(1:3).eq.'-or')read(argument(4:),*)ormax
+     if(argument(1:2).eq.'-c')ipfset=-3
      if(argument(1:3).eq.'-h')goto 1
   enddo
+  call pfset(ipfset)
   return
   1 write(*,*)'-p psi, -vs vshift, -or -oi real, imaginary omega'
   end subroutine parsefoarguments
@@ -79,9 +83,9 @@ subroutine fomegacont(psip,Omegacp,Typ,kp,vsin,lcont,lplot,err,omegap&
   ! Create filename in accordance with passed parameters
   write(filename,'(a,2i2.2,a,i3.3,a,i3.3,a,i3.3,a)')   &
        'F',nor,noi, &
-       'Oc',min(999,abs(int(100*Omegacp))),   &
-       'v',min(999,abs(int(100*vsin))),  &
-       'p',min(999,abs(int(100*psip))),'.arr'
+       'Oc',min(999,abs(nint(100*Omegacp))),   &
+       'v',min(999,abs(nint(100*vsin))),  &
+       'p',min(999,abs(nint(100*psip))),'.arr'
 
   do i=1,iargc()   ! Check cmdline for filenames.
      call getarg(i,argument)
@@ -169,12 +173,12 @@ subroutine fomegacont(psip,Omegacp,Typ,kp,vsin,lcont,lplot,err,omegap&
   endif
 
   write(*,*)'Omegac/omegab=',2*Omegac/sqrt(psi)
-  if(lplot)call lplot1(or,oi,nor,noi,vsin,omegac,psi,Ftcomplex)
-  call legendline(.1,.9,258,'Ftcomplex')
-  call pltend
-  if(lplot)call lplot1(or,oi,nor,noi,vsin,omegac,psi,Fpcomplex)
-  call legendline(.1,.9,258,'Fpcomplex')
-  call pltend
+!  if(lplot)call lplot1(or,oi,nor,noi,vsin,omegac,psi,Ftcomplex)
+!  call legendline(.1,.9,258,'Ftcomplex')
+!  call pltend
+!  if(lplot)call lplot1(or,oi,nor,noi,vsin,omegac,psi,Fpcomplex)
+!  call legendline(.1,.9,258,'Fpcomplex')
+!  call pltend
   if(lplot)call lplot1(or,oi,nor,noi,vsin,omegac,psi,Fpcomplex+Ftcomplex)
   call legendline(.1,.9,258,'Fp+Ft')
   call pltend
@@ -190,7 +194,7 @@ subroutine fomegacont(psip,Omegacp,Typ,kp,vsin,lcont,lplot,err,omegap&
   call ocomplot(or,nor,vsin,omegac,psi,(Fpcomplex(:,noi)+Ftcomplex(:,1)))
   call legendline(.1,.9,258,'Fp+Ft at imag(!Aw!@)=0')
 !  call orealplot(or,nor,vsin,omegac,psi,real(Ficomplex(:,1)))
-  call ocomplot(or,nor,vsin,omegac,psi,(Ficomplex(:,1)))
+  call ocomplot(or,nor,vsin,omegac,psi,(Ficomplex(:,1)/psi**2))
   call legendline(.1,.9,258,'Fi')
   call multiframe(0,0,0)
 
@@ -233,7 +237,6 @@ subroutine fomegacont(psip,Omegacp,Typ,kp,vsin,lcont,lplot,err,omegap&
   uqpsi=psi**1.5
   qqpsi=psi**.25
   if(lplot2)then
-     call pfset(3)
      call pltinit(0.,ormax/tqpsi,0.,oimax/uqpsi)
      call charsize(0.02,0.02)
      call axis
@@ -276,6 +279,7 @@ subroutine ionforce(Fi,omega,psiin,vsin)
   real :: psiin,vsin
   real, parameter :: mime=1836
   omegag=omega*sqrt(mime)
+  omegaonly=omegag
   psig=psiin
   isigma=-1
   vshift=vsin
@@ -291,7 +295,6 @@ subroutine lplot1(or,oi,nor,noi,vsin,omegac,psi,forcecomplex)
   integer :: icl
   real :: zclv(20)
   character*30 string
-  call pfset(3)
   call pltinit(0.,or(nor),0.,oi(noi))
   call charsize(0.02,0.02)
   call axis
@@ -406,3 +409,23 @@ subroutine complexnewton(FE,err)
   err=abs(domega/omega)
 !  write(*,*)'domega1,domega2,omega',domega1,domega2,omega
 end subroutine complexnewton
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+subroutine plotionforce(psi,Typ,vsin)
+  real :: psi,Typ,vsin
+  integer, parameter :: nfi=30
+  complex, dimension(nfi) :: Fiarray,omegaFi
+  omegamax=5.
+  write(*,*)'psi=',psi,' vsin=',vsin
+  do i=1,nfi
+     omegaFi(i)=omegamax*(float(i)/nfi)/sqrt(1836.)+complex(0.,.0001)
+     call ionforce(Fiarray(i),omegaFi(i),psi,vsin)
+  enddo
+  call minmax(Fiarray,2*nfi,fmin,fmax)
+  call pltinit(0.,omegamax/sqrt(1836.),fmin,fmax)
+  call axis
+  call axlabels('omega','Fi')
+  call polyline(real(omegaFi),real(Fiarray),nfi)
+  call polyline(real(omegaFi),imag(Fiarray),nfi)
+  call pltend
+
+end subroutine plotionforce
