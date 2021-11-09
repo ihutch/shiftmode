@@ -416,6 +416,7 @@ contains
     real :: EIm(0:nhmax),xit,vymax,hnum
     integer :: m,ncalc
     real :: Oceff   ! The effective Omegacg
+    logical :: lbess=.false.
 ! The maximum needed perp velocity, such that kg*vymax/Oc=nharmonicsg
     vymax=3.5*sqrt(2.*Tperpg)
     Oceff=max(1.e-6,max(Omegacg,kg*vymax/nhmax)) ! Don't allow zero Oceff.
@@ -436,7 +437,7 @@ contains
     omegaonly=omegag
     call FgEint(Fpg(0),isigma)
 !    write(*,*)'SumHarmonicsg: Oceff,nharmonicsg=',Oceff,nharmonicsg !,hnum
-    write(*,'(a,e11.4,''('',2e12.4,'')'',i4)')&
+    if(lbess)write(*,'(a,e11.4,''('',2e12.4,'')'',i4)')&
          ' EIm(0),Ftt(0)  =',EIm(0),Fpg(0),nharmonicsg
     Ftotalsumg=Fpg(0)*EIm(0)
     do m=1,nharmonicsg
@@ -452,7 +453,7 @@ contains
           call FgEint(Fpg(-m),isigma)
           Ftotalsumg=Ftotalsumg+Fpg(-m)*EIm(m)
        endif
-       write(*,'(a,e11.4,''('',2e12.4,'')('',2e12.4,'')'')')&
+       if(lbess)write(*,'(a,e11.4,''('',2e12.4,'')('',2e12.4,'')'')')&
             ' EIm(m),Fpg(+-m)=',EIm(m),Fpg(m),Fpg(-m)
     enddo
     omegag=omegaonly
