@@ -9,9 +9,8 @@
 program fomegasolve
   real :: kp,kmid
 !  logical :: lcont=.false.,lplot=.false.
-  logical :: lcont=.true.,lplot=.true.
+  logical :: lcont=.true.,lplot=.true.,lerase=.false.
   integer, parameter :: nk=1,noc=1
-  complex :: omegap
   real :: Omegacarr(noc),karr(nk)
   real :: ormax,oimax
 !  character*30 string
@@ -24,12 +23,17 @@ program fomegasolve
 
   psip=.25
   vsin=1.25         ! Maxwellian ion component velocity shift
-  ormax=.15
-  oimax=.04
-  call parsefoarguments(psip,vsin,ormax,oimax)
-  if(vsin.le.1.05)oimax=.15
-  if(vsin.le..9)oimax=.3
-  
+  ormax=0.
+  oimax=0.
+  call parsefoarguments(psip,vsin,ormax,oimax,lerase)
+  if(ormax.eq.0)then
+     ormax=.3*sqrt(psip)
+  endif
+  if(oimax.eq.0)then
+     oimax=.1*sqrt(psip)
+     if(vsin.le.1.2)oimax=.2*sqrt(psip)
+     if(vsin.le..9)oimax=.3*sqrt(psip)
+  endif
   do ik=1,nk
      if(nk.gt.1)then
         kp=kmid*(1.+rangek*(2.*(ik-1.)/max(1.,nk-1.)-1.))
@@ -42,36 +46,40 @@ program fomegasolve
         Omegacp=ioc*Omegacmax/noc
         Omegacarr(ioc)=Omegacp/sqrt(psip)
         call fomegacont(psip,Omegacp,Typ,kp,vsin,lcont,lplot,err&
-             &,omegap,ormax,oimax)
+             &,ormax,oimax,lerase)
      enddo
   enddo
-  call plotionforce(psip,Typ,vsin)
+!  call plotionforce(psip,Typ,vsin,Omegacp)
 end program fomegasolve
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-subroutine parsefoarguments(psip,vsin,ormax,oimax)
+subroutine parsefoarguments(psip,vsin,ormax,oimax,lerase)
   character*20 argument
+  logical :: lerase
   ipfset=3 ! default
   do i=1,iargc()
      call getarg(i,argument)
      if(argument(1:2).eq.'-p')read(argument(3:),*)psip
      if(argument(1:3).eq.'-vs')read(argument(4:),*)vsin
      if(argument(1:3).eq.'-or')read(argument(4:),*)ormax
+     if(argument(1:3).eq.'-oi')read(argument(4:),*)oimax
+     if(argument(1:2).eq.'-e')lerase=.true.
      if(argument(1:2).eq.'-c')ipfset=-3
      if(argument(1:3).eq.'-h')goto 1
   enddo
   call pfset(ipfset)
   return
-  1 write(*,*)'-p psi, -vs vshift, -or -oi real, imaginary omega'
+1 write(*,*)'-p psi, -vs vshift, -or -oi real, imag omega,',&
+       ' -c no-stopping, -e erase file'
   end subroutine parsefoarguments
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-subroutine fomegacont(psip,Omegacp,Typ,kp,vsin,lcont,lplot,err,omegap&
-     &,ormax,oimax)
+subroutine fomegacont(psip,Omegacp,Typ,kp,vsin,lcont,lplot,err,ormax,oimax,lerase)
   use shiftgen
-  complex :: omegap
+  logical :: lerase
+  complex :: omegap      ! omegag as read from file; not used.
   integer, parameter ::   nor=21,noi=21,nunconv=3
   real :: or(nor),oi(noi),FE,kp
-  complex ::  omegacomplex(nor,noi),forcecomplex(nor,noi),Fi
+  complex ::  omegacomplex(nor,noi),forcecomplex(nor,noi),Fi,Fic,Fec,Fsum
   complex ::  Ftcomplex(nor,noi),Ficomplex(nor,noi)
   real, dimension(nor,noi) :: cworka
   integer :: icl
@@ -86,7 +94,6 @@ subroutine fomegacont(psip,Omegacp,Typ,kp,vsin,lcont,lplot,err,omegap&
        'Oc',min(999,abs(nint(100*Omegacp))),   &
        'v',min(999,abs(nint(100*vsin))),  &
        'p',min(999,abs(nint(100*psip))),'.arr'
-
   do i=1,iargc()   ! Check cmdline for filenames.
      call getarg(i,argument)
      if(.not.argument(1:1).eq.'-')then
@@ -94,24 +101,27 @@ subroutine fomegacont(psip,Omegacp,Typ,kp,vsin,lcont,lplot,err,omegap&
         write(*,'(a,$)')'Specified file: '
      endif
   enddo
-!  write(*,*)filename
-
   ! Try to open the file.
-  open(12,file=filename,status='old',form='unformatted',err=101) 
-  read(12,err=101)norf,noif
-  if(norf.ne.nor.or.noif.ne.noi)then
-     write(*,*)'Reading from ',filename
-     write(*,*)'File array dimensions',norf,nori,' not compatible'
-     write(*,*)'Adjust allocation or delete file'
-     stop
-  endif
-  read(12,err=101)or,oi
-  read(12,err=101)psip,Omegacp,Typ,kp,omegap,ormax,oimax
-  read(12,err=101)omegacomplex,forcecomplex,Ftcomplex,Ficomplex
-  read(12,end=100)lions
-  close(12)
+  open(12,file=filename,status='old',form='unformatted',err=101)
+  if(.not.lerase)then
+     read(12,err=101)norf,noif
+     if(norf.ne.nor.or.noif.ne.noi)then
+        write(*,*)'Reading from ',filename
+        write(*,*)'File array dimensions',norf,nori,' not compatible'
+        write(*,*)'Adjust allocation or delete file'
+        stop
+     endif
+     read(12,err=101)or,oi
+     read(12,err=101)psip,Omegacp,Typ,kp,omegap,ormax,oimax
+     read(12,err=101)omegacomplex,forcecomplex,Ftcomplex,Ficomplex
+     read(12,end=100)lions
+     close(12)
 100  lreadit=.true.
-  write(*,*)'Read forcecomplex from file ',filename
+     write(*,*)'Read forcecomplex from file ',filename
+  else
+     write(*,*)'Overwriting forcecomplex file ',filename
+     close(12,status='delete')
+  endif
   goto 102
 101 write(*,*)'Failed to open or read from file: ', filename
 102 continue
@@ -139,17 +149,21 @@ subroutine fomegacont(psip,Omegacp,Typ,kp,vsin,lcont,lplot,err,omegap&
            do ioi=1,noi
               oi(ioi)=(ioi-1+dioi)*oimax/(noi-1+dioi)
               omegacomplex(ior,ioi)=complex(or(ior),oi(ioi))
-              omegag=omegacomplex(ior,ioi)
-              omegaonly=omegag
-              psig=-psig; call SumHarmonicsg(isigma);psig=-psig
-! Here we replace -FE with the ion force +Fi
-              Ftcomplex(ior,ioi)=Ftotalsumg
+              if(.false.)then
+                 omegag=omegacomplex(ior,ioi)
+                 omegaonly=omegag  ! Ignoring kg for now. 
+                 Omegacg=Omegac
+                 psig=-psig; call SumHarmonicsg(isigma);psig=-psig
+                 Ftcomplex(ior,ioi)=Ftotalsumg
+              else
+                 call electronforce(Ftcomplex(ior,ioi),omegacomplex(ior,ioi)&
+                      ,Omegacp,psip,isigma)
+              endif
               if(lions)then
-                 call ionforce(Fi,omegag,psip,vsin)
-!                 write(*,*)'-FE,Fi',-FE,Fi
+                 call ionforce(Fi,omegacomplex(ior,ioi),Omegacp,psip,vsin)
               endif
               Ficomplex(ior,ioi)=Fi
-              forcecomplex(ior,ioi)=Ftotalsumg+Fi
+              forcecomplex(ior,ioi)=Ftcomplex(ior,ioi)+Fi
               write(*,'(2i4,2f8.4,2f10.6)')ior,ioi,omegag,forcecomplex(ior,ioi)
            enddo 
         enddo
@@ -161,7 +175,7 @@ subroutine fomegacont(psip,Omegacp,Typ,kp,vsin,lcont,lplot,err,omegap&
         write(*,*)'Opened new file: ',filename,' and writing'
         write(12)nor,noi
         write(12)or,oi
-        write(12)psip,Omegacp,Typ,kp,omegap,ormax,oimax
+        write(12)psip,Omegacp,Typ,kp,omegag,ormax,oimax
         write(12)omegacomplex,forcecomplex,Ftcomplex,Ficomplex
         write(12)lions
         goto 104
@@ -172,63 +186,63 @@ subroutine fomegacont(psip,Omegacp,Typ,kp,vsin,lcont,lplot,err,omegap&
 
   write(*,*)'Omegac/omegab=',2*Omegac/sqrt(psig)
   if(lplot)call lplot1(or,oi,nor,noi,vsin,omegac,psig,Ftcomplex)
-  call legendline(.1,.9,258,'Fetotal')
+  call legendline(.1,.9,258,'F!de!d')
   call pltend
   if(lplot)call lplot1(or,oi,nor,noi,vsin,omegac,psig,Ficomplex)
-  call legendline(.1,.9,258,'Ficomplex')
+  call legendline(.1,.9,258,'F!di!d')
   call pltend
   if(lplot)call lplot1(or,oi,nor,noi,vsin,omegac,psig,forcecomplex)
-  call legendline(.1,.9,258,'forcecomplex')
-  call pltend
+  call legendline(.1,.9,258,'F!dtotal!d')
 
-  call multiframe(2,1,3)
-  call ocomplot(or,nor,vsin,omegac,psig,(Ftcomplex(:,1)))
-  call legendline(.1,.9,258,'Fetotal at imag(!Aw!@)=0')
-!  call orealplot(or,nor,vsin,omegac,psi,real(Ficomplex(:,1)))
-  call ocomplot(or,nor,vsin,omegac,psig,(Ficomplex(:,1)/psig**2))
-  call legendline(.1,.9,258,'Fi')
-  call multiframe(0,0,0)
-
-  if(.not.lions)then     ! Find solution by iteration.
+  if(.true..or..not.lions)then     ! Find solution by iteration.
      zoif=.01  ! Iteration minimum oimag limit factor.
      nzo=0
      write(*,'(a,f8.4,a,f8.4,a,f8.5,a,f8.4)')'psig=',psig,  &
-          ' Omegac=',Omegac,' k=',k,' Omegac/omegab=',2*Omegac/sqrt(psig)
+          ' Omegac=',Omegac,' k=',kg,' Omegac/omegab=',2*Omegac/sqrt(psig)
      omegag=complex(0.7*sqrt(psig)/8.,0.7*sqrt(psig)/16.*1.2)
-     psig=-psig; call SumHarmonicsg(isigma);psig=-psig
-  !call SumHarmonicsg(isigma)
-     err=1.
+     omegap=omegag
+     call electronforce(Fec,omegap,Omegacp,psip,isigma)
+     call ionforce(Fic,omegap,Omegacp,psip,vsin)
+     Fsum=Fec+Fic
      do i=1,10
         if(lplot)then
            call color(6)
-! Omit intermediate step indications.
-!        call polymark(real(omegag),imag(omegag),1,ichar('0')+i)
+           call polymark(real(omegag),imag(omegag),1,ichar('0')+i)
         endif
-        call complexnewton(FE,err)
+        call complexnewton(Fsum,err)
         if(imag(omegag).lt.zoif*oimax)then
            nzo=nzo+1
            omegag=complex(real(omegag),zoif*oimax)
            if(nzo.ge.nunconv)then
-              write(*,'(a,i2,a)')'Uncoverged after',nzo,' negative omegai'
+              write(*,'(a,i2,a)')'Uncoverged after',nzo,' near negative omegai'
               err=1.
               exit
            endif
         endif
-        psig=-psig; call SumHarmonicsg(isigma);psig=-psig
-!     call SumHarmonicsg(isigma)
-        Fsum=real(Ftotalsumg-FE)
+        omegap=omegag
+        call electronforce(Fec,omegap,Omegacp,psip,isigma)
+        call ionforce(Fic,omegap,Omegacp,psip,vsin)
+        Fsum=Fec+Fic
         write(*,'(a,i4,5f10.6)')'i,omegag,Fsum,err=',i+1,omegag,Fsum,err
         if(err.lt..5e-4)exit
      enddo
      if(lplot.and.nzo.lt.2)call polymark(real(omegag),imag(omegag),1,'@')
   endif
+
+  call pltend
+  call multiframe(2,1,3)
+  call ocomplot(or,nor,vsin,omegac,psig,(Ftcomplex(:,1)))
+  call legendline(.1,.9,258,'F!de!d at imag(!Aw!@)=0')
+!  call orealplot(or,nor,vsin,omegac,psi,real(Ficomplex(:,1)))
+  call ocomplot(or,nor,vsin,omegac,psig,(Ficomplex(:,1)/psig**2))
+  call legendline(.1,.9,258,'F!di!d')
+  call multiframe(0,0,0)
   if(lplot)call pltend()
-  omegap=omegag
-  sqpsi=sqrt(psig)
-  tqpsi=psig**0.75
-  uqpsi=psig**1.5
-  qqpsi=psig**.25
   if(lplot2)then
+     sqpsi=sqrt(psig)
+     tqpsi=psig**0.75
+     uqpsi=psig**1.5
+     qqpsi=psig**.25
      call pltinit(0.,ormax/tqpsi,0.,oimax/uqpsi)
      call charsize(0.02,0.02)
      call axis
@@ -274,19 +288,37 @@ subroutine fomegacont(psip,Omegacp,Typ,kp,vsin,lcont,lplot,err,omegap&
   
 end subroutine fomegacont
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-subroutine ionforce(Fi,omega,psiin,vsin)
+subroutine ionforce(Fi,omega,Omegacin,psiin,vsin)
   use shiftgen
-  complex :: Fi,omega,Ftotalg
-  real :: psiin,vsin
+  complex :: Fi,omega  !,Ftotalg
+  real :: psiin,vsin,Omegacin
   real, parameter :: mime=1836
   omegag=omega*sqrt(mime)
+  Omegacg=Omegacin*sqrt(mime)
   omegaonly=omegag
   psig=psiin
   isigma=-1
   vshift=vsin
-  call FgRepelEint(Ftotalg,isigma)
-  Fi=2.*Ftotalg
+!  call FgRepelEint(Ftotalg,isigma)  ! Some subtle differences remain.
+!  Fi=2.*Ftotalg
+  call SumHarmonicsg(isigma)
+!  if(abs(Ftotalg-Ftotalsumg).gt.1.e-4)write(*,*)Ftotalg,Ftotalsumg
+  Fi=Ftotalsumg
+! Undo changes
+  omegag=omega
+  omegaonly=omegag
+  Omegacg=Omegacg/sqrt(mime)
 end subroutine ionforce
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+subroutine electronforce(Felec,omegain,Omegac,psiin,isigma)
+  use shiftgen
+  complex :: omegain,Felec
+  omegag=omegain
+  omegaonly=omegag  ! Ignoring kg for now. 
+  Omegacg=Omegac
+  psig=-psiin; call SumHarmonicsg(isigma);psig=-psig
+  Felec=Ftotalsumg
+end subroutine electronforce
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 subroutine lplot1(or,oi,nor,noi,vsin,omegac,psi,forcecomplex)
   real :: or(nor),oi(noi)
@@ -364,32 +396,37 @@ subroutine ocomplot(or,nor,vsin,omegac,psi,ocomforce)
   call dashset(0)
 end subroutine ocomplot
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-subroutine complexnewton(FE,err)
+subroutine complexnewton(Fsum,err)
   use shiftgen
   ! Take a Newton Step in finding the complex omega root of
   ! complex force by inverting the 2x2 matrix from adjacent evaluations.
-  real :: FE,err
+  real :: err
   real :: eps1=.05,J11,J12,J21,J22,domega1,domega2,det
-  complex :: om1,om2,om3,f1,f2,f3,domega
+  complex :: om1,om2,om3,f1,f2,f3,domega,Fec,Fic,Fsum
+  psip=psig
+  vsin=vshift
+  Omegacp=Omegacg
   isigma=-1
   det=1.
-  f1=Ftotalsumg-FE
+
+  f1=Fsum
   om1=omegag
 !  if(err.gt.0.1)then ! Not a big win
   ! Calculate the Jacobian's coefficients.
   om2=om1+eps1*abs(real(om1))
-  omegag=om2
-  psig=-psig; call SumHarmonicsg(isigma);psig=-psig
-  f2=Ftotalsumg-FE
-  !  write(*,*)om1,om2,f2
+  call electronforce(Fec,om2,Omegacp,psip,isigma)
+  call ionforce(Fic,om2,Omegacp,psip,vsin)
+  f2=Fec+Fic
+!  write(*,*)f1,f2
+!  write(*,'(6g12.4)')om1,om2,f2
   if(.not.om2-om1.ne.0)stop 'om2-om1=0'
   J11=real(f2-f1)/real(om2-om1)
   J21=imag(f2-f1)/real(om2-om1)
   om3=om1+complex(0.,eps1*imag(om1))
-  omegag=om3
-  psig=-psig; call SumHarmonicsg(isigma);psig=-psig
-  f3=Ftotalsumg-FE
-  !  write(*,*)om1,om3,f3
+  call electronforce(Fec,om3,Omegacp,psip,isigma)
+  call ionforce(Fic,om3,Omegacp,psip,vsin)
+  f3=Fec+Fic
+!  write(*,'(6g12.4)')om1,om3,f3
   if(.not.om3-om1.ne.0)stop 'om3-om1=0'
   J12=real(f3-f1)/imag(om3-om1)
   J22=imag(f3-f1)/imag(om3-om1)
@@ -412,22 +449,37 @@ subroutine complexnewton(FE,err)
 !  write(*,*)'domega1,domega2,omega',domega1,domega2,omega
 end subroutine complexnewton
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-subroutine plotionforce(psi,Typ,vsin)
+subroutine plotionforce(psi,Typ,vsin,Omegacin)
+! Repurposed for Ftot and Fe.
   real :: psi,Typ,vsin
   integer, parameter :: nfi=100
-  complex, dimension(nfi) :: Fiarray,omegaFi
-  omegamax=5.
+  complex, dimension(nfi) :: Ftotarray,Fiarray,Fearray,omegaFi
+  omegamax=3.
   write(*,*)'psi=',psi,' vsin=',vsin
   do i=1,nfi
      omegaFi(i)=omegamax*(float(i)/nfi)/sqrt(1836.)+complex(0.,.0001)
-     call ionforce(Fiarray(i),omegaFi(i),psi,vsin)
+     call ionforce(Fiarray(i),omegaFi(i),Omegacin,psi,vsin)
+     call electronforce(Fearray(i),omegaFi(i),Omegacin,psi,-1)
+     Ftotarray(i)=Fearray(i)+Fiarray(i)
   enddo
-  call minmax(Fiarray,2*nfi,fmin,fmax)
-  call pltinit(0.,omegamax/sqrt(1836.),fmin,fmax)
-  call axis
-  call axlabels('omega','Fi')
-  call polyline(real(omegaFi),real(Fiarray),nfi)
-  call polyline(real(omegaFi),imag(Fiarray),nfi)
+  call minmax(Ftotarray,2*nfi,fmin,fmax)
+  call pltinit(0.,omegaFi(nfi),fmin,fmax)
+  call axis; call axis2
+  call axlabels('omega','Ftot, Fe')
+  call color(1)
+  call polyline(real(omegaFi),real(Ftotarray),nfi)
+  call color(2)
+  call dashset(1)
+  call polyline(real(omegaFi),imag(Ftotarray),nfi)
+  if(.true.)then
+  call color(3)
+  call dashset(2)
+  call polyline(real(omegaFi),real(Fearray),nfi)
+  call color(4)
+  call dashset(3)
+  call polyline(real(omegaFi),imag(Fearray),nfi)
+  endif
+  call dashset(0)
+  call color(15)
   call pltend
-
 end subroutine plotionforce
