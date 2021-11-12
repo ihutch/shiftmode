@@ -193,6 +193,7 @@
     real, dimension(nge) :: vpsiarrayp
     complex :: Ftotalg
     character*40 annote
+    lioncorrect=.false.
     omegag=(.1,0.001000)
     omegaonly=omegag
     psig=-.5
@@ -253,6 +254,7 @@
     write(*,*)'Sum mode       ',Ftraptotal+Fpasstotal
     write(*,*)'Sum gen        ',Ftotalrg+Ftotalpg
 !    write(*,*)'Ftotalg        ',Ftotalg
+    lioncorrect=.true.
   end subroutine testAttract
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   subroutine Frepelofomega
@@ -380,12 +382,13 @@
   integer :: nvs=1
   call tsparse(ormax,oi,nvs)
 ! Some tests might interfere with others.       
-  call testLofW
+  call testdenem
+!  call testLofW
   call testFrepel
   call testAttract
   call testSumHarm
-  call Frepelofomega
-  call plotionforce(.01,1.,0.)
+!  call Frepelofomega
+!  call plotionforce(.01,1.,0.)
 end program
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 subroutine ionforce(Fi,omega,omegaon,psiin,vsin,mime)
@@ -426,3 +429,21 @@ subroutine plotionforce(psi,Typ,vsin)
   call polyline(real(omegaFi),imag(Fiarray),nfi)
   call pltend
 end subroutine plotionforce
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+subroutine testdenem
+  use shiftgen
+  integer, parameter :: nvs=100
+  real, dimension(nvs) :: vs,denem
+  denem=1.
+  psig=.1
+  vsmax=2.
+  do i=1,nvs
+     vshift=i*vsmax/nvs
+     vs(i)=vshift
+     call dfefac(denem(i))
+  enddo
+  call autoplot(vs,denem,nvs)
+  call axlabels('vshift','fefac')
+  write(*,'(''Factor by which dfe trapped is multiplied for psi='',f8.3)')psig
+  call pltend
+end subroutine testdenem
