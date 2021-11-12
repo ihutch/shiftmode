@@ -41,7 +41,7 @@ module shiftgen
   complex :: omegag=(1.,0.),sqm1g=(0.,1.),Ftot,dFordirect
   complex :: omegadiff,omegaonly
   real :: psig=.1,Wg,zm=10.,v0,z0,z1,z2,zR,kg=0.,Omegacg=5.
-  real :: vshift=0.,Tinf=1.,Tperpg=1.
+  real :: vshift=0.,vrshift=0.,Tinf=1.,Tperpg=1.
   integer :: ivs,iws
   integer, parameter :: ngz=100,nge=200,nhmax=50
   integer :: iwpowg=2,nharmonicsg
@@ -492,7 +492,7 @@ contains
 ! we are evaluating an attracted species.
     if(lioncorrect.and.psig.lt.0)then
        vsx=1.3+0.2*psig
-       vsa=vshift
+       vsa=vrshift     ! The vshift of the reflected species.
        denem1=(-1.+(vsa/vsx)**ri) /(1.+0.25*psig+vsa**2*(vsa/(vsx +(3.3&
             &/vsa)**1.5))**ri)
        fdfac=(1-denem1*psig)
@@ -552,21 +552,20 @@ end function dfdWptrap
   FUNCTION expERFCC(X)
     Z=ABS(X)      
     T=1./(1.+0.5*Z)
-    expERFCC=T*EXP(-1.26551223+T*(1.00002368+T*(.37409196+             &
-         &    T*(.09678418+T*(-.18628806+T*(.27886807+T*(-1.13520398+        &
+    expERFCC=T*EXP(-1.26551223+T*(1.00002368+T*(.37409196+                  &
+         &    T*(.09678418+T*(-.18628806+T*(.27886807+T*(-1.13520398+       &
          &    T*(1.48851587+T*(-.82215223+T*.17087277)))))))))
     IF (X.LT.0.) expERFCC=2.*exp(z**2)-expERFCC
   END FUNCTION expERFCC
 !********************************************************************
-  subroutine dfefac(dfeval)
+  subroutine dfefac(dfeval)  ! Testing only. Inline above.
 ! Correct the dfedW value approximately for the alteration of trapped
 ! equilibrium distribution caused by ion density perturbation.
     real, parameter :: ri=1.4
     vsx=1.3+0.2*psig
-    vsa=vshift
+    vsa=vrshift
     denem1=(-1.+(vsa/vsx)**ri) /(1.+0.25*psig+vsa**2*(vsa/(vsx +(3.3&
          &/vsa)**1.5))**ri)
-!    write(*,*)'vsa,denem1',vsa,denem1
     dfeval=dfeval*(1-denem1*psig)
   end subroutine dfefac
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!

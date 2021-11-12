@@ -438,8 +438,8 @@ subroutine testdenem
   psig=.1
   vsmax=2.
   do i=1,nvs
-     vshift=i*vsmax/nvs
-     vs(i)=vshift
+     vrshift=i*vsmax/nvs
+     vs(i)=vrshift
      call dfefac(denem(i))
   enddo
   call autoplot(vs,denem,nvs)
