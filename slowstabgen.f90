@@ -59,7 +59,7 @@ program fomegasolve
   vsmax=vsin
   Omegacp=Omegacmax
   lplot=.false.
-  vsmin=0.35*vsmax
+  vsmin=0.5
   omegasolve=0.
   do ip=1,npsi
      psip=ip*psipmax/npsi
@@ -77,7 +77,8 @@ program fomegasolve
 !  call minmax(omegasolve,2*npsi*nvsin,ommin,ommax)
 !  call pltinit(vsinarray(nv0),vsinarray(nvsin),0.,ommax*1.1)
 ! Now scaled version  
-  call pltinit(vsinarray(nv0),vsinarray(nvsin),0.,.34)
+! Uncorrected  call pltinit(vsinarray(nv0),vsinarray(nvsin),0.,.34)
+  call pltinit(vsinarray(nv0),vsinarray(nvsin),0.,.3+psip)
   call charsize(.019,.019)
   call axis; call axis2
   call axlabels('!Bv!ds!d!@','!Aw!@/!Ay!@!u1/2!u')
@@ -304,7 +305,7 @@ subroutine iterfindroot(psip,vsin,Omegacp,omegap,isigma,lplot,ires)
   complex :: omegap,  Fec,Fic,Fsum
      zoif=.001  ! Iteration minimum oi limit factor.
      nzo=0
-     omegap=complex(0.7*sqrt(psip)/8.,0.7*sqrt(psip)/8./(1.+vsin))
+     omegap=complex(0.7*sqrt(psip)/8.,.7*sqrt(psip)/8./(1.+vsin))
      call electronforce(Fec,omegap,Omegacp,psip,isigma)
      call ionforce(Fic,omegap,Omegacp,psip,vsin,isigma)
      Fsum=Fec+Fic

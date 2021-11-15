@@ -490,7 +490,7 @@ contains
     dfdWptrap=((15./16.)/sqrt(-psig)-experfcc(sqWj)/sqrt(pig))/sqrt(2.)
 ! This is the approximate correction for ion charge applied only when
 ! we are evaluating an attracted species.
-    if(lioncorrect.and.psig.lt.0)then
+    if(lioncorrect)then
        vsx=1.3+0.2*psig
        vsa=vrshift     ! The vshift of the reflected species.
        denem1=(-1.+(vsa/vsx)**ri) /(1.+0.25*psig+vsa**2*(vsa/(vsx +(3.3&
