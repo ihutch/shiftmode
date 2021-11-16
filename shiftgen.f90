@@ -229,7 +229,8 @@ contains
        write(*,*)omegaonly,omegag
        idone=idone+1
     endif
-    Emaxg=4.*Tinf+vshift**2
+!    Emaxg=4.*Tinf+vshift**2  ! This was inadequate.
+    Emaxg=3.*(sqrt(2*Tinf)+vshift)**2
     call FgPassingEint(Ftotalpg,isigma,Emaxg)
     call FgReflectedEint(Ftotalrg,isigma)
     Ftotalg=Ftotalpg+Ftotalrg
@@ -249,6 +250,7 @@ contains
        vinfarrayp(i)=-isigma*sqrt(2.*Wgarray(i))
        call Fdirect(Wgarray(i),isigma,Forcegarray(i))
        dfe=dfdWpar(vinfarrayp(i),fvinf) ! fparallel slope and value
+!       write(*,*)'vinfarrayp(i),dfe,fvinf',vinfarrayp(i),dfe,fvinf
        dfeperp=-fvinf/Tperpg
        if(i.eq.1)then  ! Start of integration approximated
           dvinf=abs(vinfarrayp(i))-sqrt(2.*max(psig,0.))
@@ -278,7 +280,9 @@ contains
        Wgarray(i)=psig*(1.-(i/float(nge))**2)
        vinfarrayr(i)=-isigma*sqrt(2.*Wgarray(i))
        call Fdirect(Wgarray(i),isigma,Forcegarray(i))
-       dfe=dfdWpar(vinfarrayp(i),fvinf) ! fparallel slope and value
+! This seems to have been an error found 16 Nov 2021.       
+!       dfe=dfdWpar(vinfarrayp(i),fvinf) ! fparallel slope and value
+       dfe=dfdWpar(vinfarrayr(i),fvinf) ! fparallel slope and value
        dfeperp=-fvinf/Tperpg
        if(i.eq.1)then
           dvinf=abs(vinfarrayr(i))-sqrt(2.*psig)
@@ -289,7 +293,8 @@ contains
                (Forcegarray(i)*(omegag*dfe-omegadiff*dfeperp) &
                +Forcegarray(i-1)*(omegag*dfepre-omegadiff*dfeperppre))
        endif
-       Forcegr(i)=Forcegarray(i)*omegag*dfdWpar(vinfarrayr(i),fvinf)
+!       Forcegr(i)=Forcegarray(i)*omegag*dfdWpar(vinfarrayr(i),fvinf)
+       Forcegr(i)=Forcegarray(i)*(omegag*dfe-omegadiff*dfeperp)
        tbr(i)=taug(ngz)
        dfepre=dfe
        dfeperppre=dfeperp
@@ -360,7 +365,7 @@ contains
        Fnonresg(i)=Fnonresg(i)+sqm1g*real(Fnonresg(i)-Fnonresg(i-1))  &
             /real(omegabg(i)-omegabg(i-1))*obi
        if(taug(ngz)*imag(omegag).lt.-2.)then!Hack fix giant dFdvpsi problem
-          write(*,*)'Drop',taug(ngz),imag(omegag),dFdvpsig
+          write(*,*)'Drop giant taug*omegai',taug(ngz),imag(omegag),dFdvpsig
           Fnonresg(i)=0. 
        endif
 ! Then divide by the resonance denominator multiply by complex dvpsi and sum.

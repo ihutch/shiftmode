@@ -1,5 +1,4 @@
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
   subroutine testLofW
     use shiftgen
     use shiftmode
@@ -73,7 +72,7 @@
 
     if(lplotmz)call pltend
 
-    call pfset(3)
+!    call pfset(3)
     call multiframe(2,1,0)
     if(psig.lt.0)call pltinit(-zm,zm,0.,-isigma*1.5*sqrt(2.*abs(psig)))
     if(psig.ge.0)call pltinit(-zm,zm,-1.5*sqrt(2.*abs(psig)),1.5*sqrt(2.*abs(psig)))
@@ -138,53 +137,80 @@
   subroutine testFrepel
     use shiftgen
     complex :: Ftotalg
-    character*40 annote
-    omegag=(.1,0.00000)
+    character*100 annote,tban
+    if(real(omegag).eq.0.)omegag=(.1,0.00000)
+    write(*,*)omegag
     omegaonly=omegag
-    psig=.5
-    isigma=-1    
-    vshift=1.
-    write(annote,'(''!Ay!@='',f5.3,'' !Aw!@=('',f5.3'','',f5.3,'')'')')&
-         psig,real(omegag),imag(omegag)
-    call dcharsize(.018,.018)
-    call multiframe(2,1,2)
-       call FgRepelEint(Ftotalg,isigma)
-       write(*,*)'Repelling Ftotalpg',Ftotalpg
-       write(*,*)'Repelling Ftotalrg',Ftotalrg
-       call pltinit(vinfarrayr(nge),vinfarrayp(nge),0.,Wgarrayp(nge))
-       call axis
-       call axlabels('v!d!A;!@!d','W')
-       call legendline(0.5,0.9,258,annote(1:lentrim(annote)))
-       call winset(.true.)
-       call polymark(vinfarrayp,Wgarrayp,nge,1)
-       call polyline(vinfarrayp,Wgarrayp,nge)
-       call polyline(vinfarrayr,Wgarrayr,nge)
-       call polymark(vinfarrayr,Wgarrayr,nge,2)
-       call polyline(vinfarrayp,tbp/10.,nge)
-       
-       call polyline(vinfarrayr,tbr/10.,nge)
-       call legendline(.2,.9,0,' t!dorbit!d/10')
+    if(psig.le.0)psig=.5
+    isigma=-1
+ !   vshift=1.
+    write(annote,'(''!Ay!@='',f5.3,'' !Aw!@=('',f5.3'','',f5.3,'')'', '//&
+         ' ''  v!ds!d='',f5.3)')psig,real(omegag),imag(omegag),vshift
+!    call fvinfplot
+    call FgRepelEint(Ftotalg,isigma)
+    tbmax=tbr(nge-2)*0.9
+    tbfac=5.*nint(tbmax/Wgarrayp(nge)/5.)
+!    write(*,*)tbfac,tbmax,int(nge*.9)
+    write(*,*)'Repelling Ftotalpg',Ftotalpg
+    write(*,*)'Repelling Ftotalrg',Ftotalrg
+    call dcharsize(.025,.025)
+    call multiframe(2,2,0)
+    call pltinit(vinfarrayr(nge),vinfarrayr(1),0.0001,Wgarrayp(nge))
+!       call axlabels('v!d!A;!@!d','W')
+    call axis
+    call axlabels('','W!d!A|!@!d')
+    call legendline(0.5,1.06,258,annote(1:lentrim(annote)))
+    call winset(.true.)
+    call polyline(vinfarrayr,Wgarrayr,nge)
+!    call polymark(vinfarrayr,Wgarrayr,nge,ichar('|'))
+    call dashset(2)
+    call color(5)
+    call fwrite(tbfac,iwidth,0,tban)
+    call polyline(vinfarrayr,tbr/tbfac,nge)
+    call legendline(.5,.3,0,' !Bt!@!dorbit!d/'//tban(1:iwidth))
+    call dashset(0)
+    call color(15)
+    call polymark(vinfarrayr,Wgarrayp(nge)*.98+1.e-6*Wgarrayp,nge,ichar('|'))
 !    call pltend
-       call minmax(forcegp,2*nge,pmin,pmax)
-       call minmax(forcegr,2*nge,rmin,rmax)
-       call pltinit(vinfarrayr(nge),vinfarrayp(nge),min(pmin,rmin),max(pmax,rmax))
-       call axis
-       call axlabels('v!d!A;!@!d','dF/dv!d!a;!@!d')
-       call color(1)
-       call polyline(vinfarrayr,real(forcegr),nge)
-       call polyline(vinfarrayp,real(forcegp),nge)
-!    call polymark(vinfarrayr,real(forcegr),nge,1)
-!    call polymark(vinfarrayp,real(forcegp),nge,1)
-       call legendline(.6,.7,0,' real')
-       call color(2)
-       call polyline(vinfarrayr,imag(forcegr),nge)
-       call polyline(vinfarrayp,imag(forcegp),nge)
-!    call polymark(vinfarrayr,imag(forcegr),nge,2)
-!    call polymark(vinfarrayp,imag(forcegp),nge,2)
-       call legendline(.6,.8,0,' imag')
-       call pltend
-       call multiframe(0,0,0)
-    call fvinfplot
+    call minmax(forcegp,2*nge,pmin,pmax)
+    call minmax(forcegr,2*nge,rmin,rmax)
+    call pltinit(vinfarrayr(nge),vinfarrayr(1),min(pmin,rmin),max(pmax,rmax))
+    call axis
+    call axlabels('v!d!A;!@!d','dF/dv!d!a;!@!d')
+    call legendline(.3,.9,258,'Reflected')
+    call color(1)
+    call polyline(vinfarrayr,real(forcegr),nge)
+    call legendline(.2,.12,0,' real')
+    call color(2)
+    call dashset(2)
+    call polyline(vinfarrayr,imag(forcegr),nge)
+    call legendline(.2,.06,0,' imag')
+    call dashset(0)
+    call color(15)
+    call pltinit(vinfarrayp(1),vinfarrayp(nge),0.,Wgarrayp(nge))
+    call axis
+    call axis2
+    call winset(.true.)
+    call polymark(vinfarrayp,Wgarrayp(nge)*.98+1.e-6*Wgarrayp,nge,ichar('|'))
+    call polyline(vinfarrayp,Wgarrayp,nge)
+    call dashset(2)
+    call color(5)
+    call polyline(vinfarrayp,tbp/tbfac,nge)
+    call dashset(0)
+    call color(15)
+    call pltinit(vinfarrayp(1),vinfarrayp(nge),min(pmin,rmin),max(pmax,rmax))
+    call legendline(.3,.9,258,'Passing')
+    call axis
+    call axis2
+    call axlabels('v!d!A;!@!d','')
+    call color(1)
+    call polyline(vinfarrayp,real(forcegp),nge)
+    call color(2)
+    call dashset(2)
+    call polyline(vinfarrayp,imag(forcegp),nge)
+    call dashset(0)
+    call pltend
+    call multiframe(0,0,0)
   end subroutine testFrepel
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   subroutine testAttract
@@ -192,54 +218,62 @@
     use shiftmode
     real, dimension(nge) :: vpsiarrayp
     complex :: Ftotalg
-    character*40 annote
+    character*40 annote,ffan
     lioncorrect=.false.
-    omegag=(.1,0.001000)
+    if(real(omegag).eq.0)omegag=(.1,0.001000)
     omegaonly=omegag
-    psig=-.5
+    if(psig.ge.0)psig=-.5
     isigma=-1    
-    vshift=0.
+    if(vshift.ne.0.)write(*,*)'WARNING testAttract with vshift=',vshift
 !    write(*,*)'Entered testattract'
     write(annote,'(''!Ay!@='',f5.3,'' !Aw!@=('',f5.3'','',f5.3,'')'')')&
          psig,real(omegag),imag(omegag)
-    call dcharsize(.018,.018)
-    call multiframe(2,1,2)
+    call dcharsize(.02,.02)
 !    call FgAttractEint(Ftotalg,isigma)
     call FgEint(Ftotalg,isigma)  ! Generic call is the same.
 !    write(*,*)'Return from FgAttractEint. Ftotalg=',Ftotalg
     vpsiarrayp=sqrt(2.*(Wgarrayp(1:nge)-psig))
-!    call pltinit(vinfarrayr(nge),vinfarrayp(nge),psig,Wgarrayp(nge))
-    call pltinit(vinfarrayr(nge),vpsiarrayp(nge),psig,Wgarrayp(nge))
-    call axis
-    call axlabels('v!d!Ay!@!d','W')
-    call legendline(0.5,0.9,258,annote(1:lentrim(annote)))
-    call polymark(vinfarrayr,Wgarrayr,nge,1)
-    call polyline(vinfarrayr,Wgarrayr,nge)
-    call polyline(vpsiarrayp,Wgarrayp,nge)
-    call polymark(vpsiarrayp,Wgarrayp,nge,2)
-    
+!    call fvinfplot
+    call multiframe(1,2,0)
     call minmax(forcegp,2*nge,pmin,pmax)
     call minmax(forcegr,2*nge,rmin,rmax)
-!    write(*,*)'pmin,pmax,rmin,rmax',pmin,pmax,rmin,rmax
-    call pltinit(vinfarrayr(nge),vpsiarrayp(nge),min(pmin,rmin),max(pmax,rmax))
-    call axis
-    call axlabels('v!d!Ay!@!d','dF/dv!d!a;!@!d')
+    fpfac=5.*max(int(min(abs(rmax/pmax),abs(rmin/pmin))/5.),1)
+    call fwrite(fpfac,iwidth,0,ffan)
+    call pltinit(vinfarrayr(nge),vinfarrayr(1)*1.01,min(pmin,rmin),max(pmax,rmax))
+    call axis; call axis2
+    call axlabels('v!d!Ay!@!d','dF/dv!d!Ay!@!d')
+    call legendline(0.5,1.03,258,annote(1:lentrim(annote)))
+    call legendline(0.3,.9,258,'Trapped')
+    call winset(.true.)
+    call polymark(vinfarrayr,(max(pmax,rmax)*.97+vinfarray*1.e-7),nge&
+         &,ichar('|'))
     call color(1)
     call polyline(vinfarrayr,real(forcegr),nge)
-    call legendline(.6,.7,0,' real trapped')
+    call legendline(.05,.1,0,' real')
     call color(2)
+    call dashset(2)
     call polyline(vinfarrayr,imag(forcegr),nge)
-    call legendline(.6,.8,0,' imag trapped')
+    call legendline(.05,.05,0,' imag')
+    call color(15)
+    call dashset(0)
+    call pltinit(vpsiarrayp(1),vpsiarrayp(nge),min(pmin,rmin),max(pmax,rmax))
+    call axis; call axis2 
+    call axlabels('v!d!Ay!@!d','')
+    call legendline(0.3,.9,258,'Passing')
+    call winset(.true.)
+    call polymark(vpsiarrayp,(max(pmax,rmax)*.97+vpsiarray*1.e-7),nge&
+         &,ichar('|'))
     call color(3)
-    call polyline(vpsiarrayp,10.*imag(forcegp),nge)
-    call legendline(.6,.6,0,' 10xreal passing')
+    call polyline(vpsiarrayp,fpfac*imag(forcegp),nge)
+    call legendline(.4,.1,0,' realx'//ffan(1:iwidth))
     call color(4)
-    call polyline(vpsiarrayp,10.*real(forcegp),nge)
-    call legendline(.6,.5,0,' 10ximag passing')
+    call dashset(2)
+    call polyline(vpsiarrayp,fpfac*real(forcegp),nge)
+    call legendline(.4,.05,0,' imagx'//ffan(1:iwidth))
+    call dashset(0)
     call pltend
+    
     call multiframe(0,0,0)
-!       stop
-    call fvinfplot
     psi=-psig                     ! psi is the positive depth
     omega=omegag
     omegad=omega
@@ -273,7 +307,8 @@
     Fimmobile=(128./315.)/2.       ! Now normalized *psig**2 
 ! Because frcomplex includes only one velocity direction.
     nvs=1
-    call tsparse(ormax,oi,nvs)
+    call tsparse(ormax,oi,nvs,isw)
+    write(*,*)'vshift,psig,nvs',vshift,psig,nvs
     psig=abs(psig)
     vsmax=vshift
     ol=.4
@@ -291,8 +326,9 @@
                   i,omegag,omegaonly,frcomplex(i),psig,isigma
              stop
           endif
-! Test of ionforce
-          call ionforce(fion(i),omegag/sqrt(1836.),omegag/sqrt(1836.),psig,0.,1836.)
+! Test of ionforce, which takes electron omega arguments, whereas omega
+! here has been specified in ion units.
+          call ionforce(fion(i),omegag/sqrt(1836.),omegag/sqrt(1836.),psig,vshift,1836.)
           fion(i)=fion(i)/psig**2/2.
           frcomplex(i)=frcomplex(i)/psig**2
           diffmax=max(diffmax,abs(fion(i)-frcomplex(i)))
@@ -302,8 +338,19 @@
           write(*,*)'Fimmobile/2=',Fimmobile,' Fdirect=',frcomplex(nor)
           write(*,'(a,f9.5,a,f9.5)')' vshift=',vshift,' psig=',psig
           call pltinit(0.,or(nor),-0.8*Fimmobile,1.2*Fimmobile)
-          call axis; call axis2
-          call axlabels('real(!Aw!@)/!Aw!@!dpi!d','Force/!Ay!@!u2!u')
+          call charsize(.02,.02)
+          call axis
+          call axptset(0.,1.)
+          call ticrev
+          call altxaxis(1./sqrt(1836.),1./sqrt(1836.))
+          call legendline(.35,1.13,258,'real(!Aw!@)/!Aw!@!dpe!d')
+          call axptset(1.,0.)
+          call ticlabtog
+          call altyaxis(1.,1.)
+          call ticlabtog
+          call axptset(0.,0.)
+          call ticrev
+          call axlabels('real(!Aw!@)/!Aw!@!dpi!d','!p!o~!o!qF!di!d/!Ay!@!u2!u')
           call polymark(ormax,Fimmobile,1,1)
        endif
        call color(mod(j-1,15)+1)
@@ -326,7 +373,7 @@
 !    complex :: Ftotalg
     ormax=.1
     psig=-.1
-    call tsparse(ormax,oi,nvs)
+    call tsparse(ormax,oi,nvs,isw)
     if(oi.lt.0.00001)oi=.00001
     omegag=complex(ormax,oi)
     omegaonly=omegag
@@ -355,9 +402,10 @@
     endif
   end subroutine testSumHarm
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  subroutine tsparse(ormax,oi,nvs)
+  subroutine tsparse(ormax,oi,nvs,isw)
     use shiftgen
     character*30 argument
+    isw=0
     do i=1,iargc()
        call getarg(i,argument)
        if(argument(1:2).eq.'-p')read(argument(3:),*)psig
@@ -369,27 +417,33 @@
        if(argument(1:3).eq.'-oc')read(argument(4:),*)Omegacg
        if(argument(1:3).eq.'-kg')read(argument(4:),*)kg
        if(argument(1:2).eq.'-n')read(argument(3:),*)nvs
+       if(argument(1:2).eq.'-c')call pfset(-3)
+       if(argument(1:2).eq.'-s')then
+          read(argument(3:),*)j
+          isw=isw+j
+       endif
        if(argument(1:2).eq.'-h')goto 1
     enddo
+    if(isw.eq.0)isw=1
     return
 1   continue
-    write(*,*)' Usage: testshiftgen [-p,-v,-i,-zm,-or,-oi,-oc,-n,-h]'
-    write(*,'(a,f8.3,a,f8.3,a,f8.3,a,f8.3,a,i3,a,f8.3,a,f8.3)')&
-         'psi=',psig,' zm=',zm,' omax=',ormax,' v=',vshift,' nv=',nvs&
-         ,' oc=',Omegacg,' kg=',kg
+    write(*,*)' Usage: testshiftgen [-p,-v,-i,-zm,-or,-oi,-oc,-kg,-s,-n -h]'
+    write(*,101) '-p..         set psi         [',psig
+    write(*,101) '-v..         set vshift(max) [',vshift
+    write(*,101) '-zm..        set zmax        [',zm
+    write(*,101) '-or.. -oi..  set omega       [',ormax,oi
+    write(*,101) '-oc.. -kg..  set O_c, set k  [',Omegacg,kg
+    write(*,102) '-n..         set number of vs[',nvs
+    write(*,102) '-s..         set switches    [',isw
+    write(*,*)' s=1 Frepel, 2 Fattract, 4 Fr(omega), 8 PlotForce, 16&
+         & denem',', LofW, 64 SumHarm'
+    write(*,*)' s=128 fvinfplot.'
+!    write(*,'(a,f8.3,a,f8.3,a,f8.3,a,f8.3,a,i3,a,f8.3,a,f8.3)') 'psi&
+!         &=',psig,' zm=',zm,' omax=',ormax,' v=',vshift,' nv=',nvs ,'&
+!         & oc=',Omegacg,' kg=',kg
+    101 format(a,6f8.4)
+    102 format(a,i5)
   end subroutine tsparse
-!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  integer :: nvs=1
-  call tsparse(ormax,oi,nvs)
-! Some tests might interfere with others.       
-  call testdenem
-!  call testLofW
-  call testFrepel
-  call testAttract
-  call testSumHarm
-!  call Frepelofomega
-!  call plotionforce(.01,1.,0.)
-end program
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 subroutine ionforce(Fi,omega,omegaon,psiin,vsin,mime)
 ! Calculate ion force for given parameters and ion to electron mass mime.
@@ -447,3 +501,26 @@ subroutine testdenem
   write(*,'(''Factor by which dfe trapped is multiplied for psi='',f8.3)')psig
   call pltend
 end subroutine testdenem
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+use shiftgen
+integer :: nvs=1,isw=0
+real :: ormax=0.,oi=0.
+call tsparse(ormax,oi,nvs,isw)
+omegag=complex(ormax,oi)
+! Some tests might interfere with others.
+  if(isw-2*(isw/2).eq.1) call testFrepel
+  isw=isw/2 ! 2
+  if(isw-2*(isw/2).eq.1) call testAttract
+  isw=isw/2 ! 4
+  if(isw-2*(isw/2).eq.1) call Frepelofomega
+  isw=isw/2 ! 8
+  if(isw-2*(isw/2).eq.1) call plotionforce(.01,1.,0.)
+  isw=isw/2 ! 16
+  if(isw-2*(isw/2).eq.1) call testdenem
+  isw=isw/2 ! 32
+  if(isw-2*(isw/2).eq.1) call testLofW
+  isw=isw/2 ! 64
+  if(isw-2*(isw/2).eq.1) call testSumHarm
+  isw=isw/2 ! 128
+  if(isw-2*(isw/2).eq.1) call fvinfplot
+end program
