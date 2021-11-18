@@ -33,8 +33,8 @@ program fomegasolve
   endif
   if(oimax.eq.0)then
      oimax=.1*sqrt(psip)
-     if(vsin.le.1.2)oimax=.2*sqrt(psip)
-     if(vsin.le..9)oimax=.3*sqrt(psip)
+     if(vsin.le.1.2)oimax=.3*sqrt(psip)
+     if(vsin.le..9)oimax=.4*sqrt(psip)
   endif
 ! This loop is the contouring of psimax and vsmax case.  
   if(lplot)then
@@ -124,7 +124,9 @@ subroutine parsefoarguments(psip,vsin,ormax,oimax,Omegacmax,lerase,lcont,lplot)
   return
 1 write(*,*)'-p psi, -vs vshift, -or -oi real, imag omega,',&
        ' -c no-stopping, -e erase file'
-  end subroutine parsefoarguments
+  write(*,*)'-lp toggle on contours' 
+  stop
+end subroutine parsefoarguments
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 subroutine fomegacont(psip,Omegacp,Typ,kp,vsin,lcont,lplot,err,ormax,oimax,lerase)
 !  use shiftgen
@@ -222,15 +224,15 @@ subroutine fomegacont(psip,Omegacp,Typ,kp,vsin,lcont,lplot,err,ormax,oimax,leras
 
   write(*,*)'Omegacp/omegab=',2*Omegacp/sqrt(psip)
   if(lplot)then
-     call lplot1(or,oi,nor,noi,vsin,omegac,psip,Ftcomplex)
-     call legendline(.1,.9,258,'F!de!d')
+     call lplot1(or,oi,nor,noi,vsin,omegacp,psip,Ftcomplex/psip**2)
+     call legendline(.1,.9,258,'!p!o~!o!qF!de!d/!Ay!@!u2!u')
      call pltend
-     call lplot1(or,oi,nor,noi,vsin,omegac,psip,Ficomplex)
-     call legendline(.1,.9,258,'F!di!d')
+     call lplot1(or,oi,nor,noi,vsin,omegacp,psip,Ficomplex/psip**2)
+     call legendline(.1,.9,258,'!p!o~!o!qF!di!d/!Ay!@!u2!u')
      call pltend
   
-     call lplot1(or,oi,nor,noi,vsin,omegac,psip,forcecomplex)
-     call legendline(.1,.9,258,'F!dtotal!d')
+     call lplot1(or,oi,nor,noi,vsin,omegacp,psip,forcecomplex/psip**2)
+     call legendline(.1,.9,258,'!p!o~!o!qF/!Ay!@!u2!u')
   endif
      
 ! Find root and plot it converging (omegag is set to found omegap implicitly)  
@@ -239,10 +241,10 @@ subroutine fomegacont(psip,Omegacp,Typ,kp,vsin,lcont,lplot,err,ormax,oimax,leras
   if(lplot)     call pltend
   if(lplot3)then
      call multiframe(2,1,3)
-     call ocomplot(or,nor,vsin,omegac,psip,(Ftcomplex(:,1)))
+     call ocomplot(or,nor,vsin,omegacp,psip,(Ftcomplex(:,1))/psip**2)
      call legendline(.1,.9,258,'F!de!d at imag(!Aw!@)=0')
-!  call orealplot(or,nor,vsin,omegac,psi,real(Ficomplex(:,1)))
-     call ocomplot(or,nor,vsin,omegac,psip,(Ficomplex(:,1)/psip**2))
+!  call orealplot(or,nor,vsin,omegacp,psi,real(Ficomplex(:,1)))
+     call ocomplot(or,nor,vsin,omegacp,psip,(Ficomplex(:,1)/psip**2))
      call legendline(.1,.9,258,'F!di!d')
      call multiframe(0,0,0)
      call pltend()
@@ -285,7 +287,7 @@ subroutine fomegacont(psip,Omegacp,Typ,kp,vsin,lcont,lplot,err,ormax,oimax,leras
      call color(15)
      call fwrite(kp/qqpsi,iwidth,3,string)
      call legendline(0.05,1.04,258,'k/!Ay!@!u1/4!u='//string)
-     call fwrite(omegac,iwidth,2,string)
+     call fwrite(omegacp,iwidth,2,string)
      call legendline(.45,1.04,258,'!AW!@='//string)
      call fwrite(psip,iwidth,2,string)
      call legendline(.8,1.04,258,'!Ay!@='//string)
@@ -305,7 +307,7 @@ subroutine iterfindroot(psip,vsin,Omegacp,omegap,isigma,lplot,ires)
   complex :: omegap,  Fec,Fic,Fsum
      zoif=.001  ! Iteration minimum oi limit factor.
      nzo=0
-     omegap=complex(0.7*sqrt(psip)/8.,.7*sqrt(psip)/8./(1.+vsin))
+     omegap=complex(0.7*sqrt(psip)/8.,.9*sqrt(psip)/8./(1.+vsin))
      call electronforce(Fec,omegap,Omegacp,psip,isigma)
      call ionforce(Fic,omegap,Omegacp,psip,vsin,isigma)
      Fsum=Fec+Fic
@@ -313,7 +315,7 @@ subroutine iterfindroot(psip,vsin,Omegacp,omegap,isigma,lplot,ires)
         ires=i
         if(lplot)then
            call color(6)
-           call polymark(real(omegap),imag(omegap),1,ichar('0')+i)
+           call polymark(max(real(omegap),-2e-3),imag(omegap),1,ichar('0')+i)
         endif
         call complexnewton(Fsum,omegap,err,psip,isigma,vsin,Omegacp)
         if(imag(omegap).lt.zoif*sqrt(psip))then
@@ -386,7 +388,7 @@ end subroutine complexnewton
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 ! Plotting routines.
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-subroutine lplot1(or,oi,nor,noi,vsin,omegac,psi,forcecomplex)
+subroutine lplot1(or,oi,nor,noi,vsin,omegacp,psi,forcecomplex)
   real :: or(nor),oi(noi)
   complex ::  forcecomplex(nor,noi)
 !  complex ::  Fpcomplex(nor,noi),Ftcomplex(nor,noi),Ficomplex(nor,noi)
@@ -429,14 +431,14 @@ subroutine lplot1(or,oi,nor,noi,vsin,omegac,psi,forcecomplex)
 !        call legendline(0.1,1.04,258,'k='//string)
   call fwrite(vsin,iwidth,3,string)
   call legendline(0.1,1.04,258,'v!ds!d='//string)
-  call fwrite(omegac,iwidth,3,string)
+  call fwrite(omegacp,iwidth,3,string)
   call legendline(.45,1.04,258,'!AW!@='//string)
   call fwrite(psi,iwidth,2,string)
   call legendline(.8,1.04,258,'!Ay!@='//string)
   call dashset(0)
 end subroutine lplot1
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-subroutine orealplot(or,nor,vsin,omegac,psi,orealforce)
+subroutine orealplot(or,nor,vsin,omegacp,psi,orealforce)
   real ::  or(nor)
   real ::  orealforce(nor)
 
@@ -447,7 +449,7 @@ subroutine orealplot(or,nor,vsin,omegac,psi,orealforce)
   call polyline(or,orealforce,nor)
 end subroutine orealplot
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-subroutine ocomplot(or,nor,vsin,omegac,psi,ocomforce)
+subroutine ocomplot(or,nor,vsin,omegacp,psi,ocomforce)
   real ::  or(nor)
   complex ::  ocomforce(nor)
   call minmax(ocomforce,2*nor,fmin,fmax)
@@ -518,12 +520,12 @@ subroutine ionforce(Fi,omega,Omegacin,psiin,vsin,isigma)
   Omegacg=Omegacg/sqrt(mime)
 end subroutine ionforce
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-subroutine electronforce(Felec,omegain,Omegac,psiin,isigma)
+subroutine electronforce(Felec,omegain,Omegacp,psiin,isigma)
   use shiftgen
   complex :: omegain,Felec
   omegag=omegain
   omegaonly=omegag  ! Ignoring kg for now. 
-  Omegacg=Omegac
+  Omegacg=Omegacp
   psig=-psiin; call SumHarmonicsg(isigma); psig=-psig
   Felec=Ftotalsumg
 end subroutine electronforce

@@ -218,7 +218,6 @@ contains
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!  
   subroutine FgRepelEint(Ftotalg,isigma)
 ! Integrate the force over energy to obtain the full parallel distribution
-! This version ignores possible dependence on v-perp (for now). 
 ! Just for positive (repelling) psig. isigma is the entering z-sign.
 ! For symmetric potentials and f(v), the returned Ftotalg can simply be
 ! doubled to give the total force since then it is symmetric in isigma.
@@ -230,10 +229,10 @@ contains
        idone=idone+1
     endif
 !    Emaxg=4.*Tinf+vshift**2  ! This was inadequate.
-    Emaxg=3.*(sqrt(2*Tinf)+vshift)**2
+    Emaxg=2.5*(sqrt(2*Tinf)+vshift)**2
     call FgPassingEint(Ftotalpg,isigma,Emaxg)
     call FgReflectedEint(Ftotalrg,isigma)
-    Ftotalg=Ftotalpg+Ftotalrg
+    Ftotalg=(Ftotalpg+Ftotalrg)*2. ! Both v-directions
   end subroutine FgRepelEint
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   subroutine FgPassingEint(Ftp,isigma,Emaxg)
@@ -316,8 +315,7 @@ contains
     call FgPassingEint(Ftotalpg,isigma,Emaxg)
     call FgTrappedEint(Ftotalrg,-1/Tperpg,1.,isigma)
  ! Hacked dfperpdWperp, fperp, because only Maxwellian perp distrib.    
-    Ftotalpg=2.*Ftotalpg ! Because both passing v-directions not yet done.
-    Ftotalg=Ftotalpg+Ftotalrg
+    Ftotalg=(Ftotalpg+Ftotalrg)*2. ! account for both v-directions 
 !    write(*,*)'Fs',Ftotalpg,Ftotalrg
   end subroutine FgAttractEint
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!  
@@ -382,8 +380,9 @@ contains
           write(*,*)fe,dfe,dfeperp
           stop
        endif
-       ! Multiply by 2. to account for \pm v_\psi.
-       Ftotal=Ftotal+2.*Ftrapg(i)       ! Add to Ftotal integral.
+! Multiply by 2. to account for \pm v_\psi.
+!       Ftotal=Ftotal+2.*Ftrapg(i)       ! Add to Ftotal integral.
+       Ftotal=Ftotal+Ftrapg(i)       ! Add to Ftotal integral.
        if(lcompare)call  Ftrapcompare(i,dfe,dfeperp,obi,resdenom&
             &,resdprev,cdvpsi,Ftotal,dFdvpsig,vpsi)
        vpsiprev=vpsi
@@ -392,7 +391,8 @@ contains
     ! Calculate end by extrapolation.
     Ftrapg(nge)=Ftrapg(nge-1)+0.5*(Ftrapg(nge-1)-Ftrapg(nge-2))
     Fnonresg(nge)=Fnonresg(nge-1)
-    Ftotal=Ftotal+2.*Ftrapg(nge)
+!    Ftotal=Ftotal+2.*Ftrapg(nge)
+    Ftotal=Ftotal+Ftrapg(nge)
     Wgarray(nge)=psig
     Wgarrayr=Wgarray
     if(lcompare)call  Ftrapcompare(i,dfe,dfeperp,obi,resdenom&

@@ -153,13 +153,13 @@
 !    write(*,*)tbfac,tbmax,int(nge*.9)
     write(*,*)'Repelling Ftotalpg',Ftotalpg
     write(*,*)'Repelling Ftotalrg',Ftotalrg
-    call dcharsize(.025,.025)
+    call dcharsize(.03,.03)
     call multiframe(2,2,0)
-    call pltinit(vinfarrayr(nge),vinfarrayr(1),0.0001,Wgarrayp(nge))
+    call pltinit(vinfarrayr(nge),vinfarrayr(1),0.0005,Wgarrayp(nge))
 !       call axlabels('v!d!A;!@!d','W')
     call axis
     call axlabels('','W!d!A|!@!d')
-    call legendline(0.5,1.06,258,annote(1:lentrim(annote)))
+    call legendline(0.5,1.08,258,annote(1:lentrim(annote)))
     call winset(.true.)
     call polyline(vinfarrayr,Wgarrayr,nge)
 !    call polymark(vinfarrayr,Wgarrayr,nge,ichar('|'))
@@ -180,11 +180,11 @@
     call legendline(.3,.9,258,'Reflected')
     call color(1)
     call polyline(vinfarrayr,real(forcegr),nge)
-    call legendline(.2,.12,0,' real')
+    call legendline(.2,.16,0,' real')
     call color(2)
     call dashset(2)
     call polyline(vinfarrayr,imag(forcegr),nge)
-    call legendline(.2,.06,0,' imag')
+    call legendline(.2,.08,0,' imag')
     call dashset(0)
     call color(15)
     call pltinit(vinfarrayp(1),vinfarrayp(nge),0.,Wgarrayp(nge))
@@ -228,10 +228,8 @@
 !    write(*,*)'Entered testattract'
     write(annote,'(''!Ay!@='',f5.3,'' !Aw!@=('',f5.3'','',f5.3,'')'')')&
          psig,real(omegag),imag(omegag)
-    call dcharsize(.02,.02)
-!    call FgAttractEint(Ftotalg,isigma)
+    call dcharsize(.025,.025)
     call FgEint(Ftotalg,isigma)  ! Generic call is the same.
-!    write(*,*)'Return from FgAttractEint. Ftotalg=',Ftotalg
     vpsiarrayp=sqrt(2.*(Wgarrayp(1:nge)-psig))
 !    call fvinfplot
     call multiframe(1,2,0)
@@ -304,7 +302,7 @@
     psig=0.01
     vshift=0.
     isigma=-1
-    Fimmobile=(128./315.)/2.       ! Now normalized *psig**2 
+    Fimmobile=(128./315.)       ! Now normalized *psig**2 
 ! Because frcomplex includes only one velocity direction.
     nvs=1
     call tsparse(ormax,oi,nvs,isw)
@@ -367,6 +365,107 @@
     call pltend
   end subroutine Frepelofomega
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  subroutine Frepelofimagomega
+    use shiftgen
+    integer, parameter :: nor=100
+    real, dimension(nor) :: or
+    complex, dimension(nor) :: frcomplex,fion,felectron,felec2
+    character*30 string
+!    complex :: Ftotalg
+    kg=0.
+    ormax=10.   !defaults
+    oi=0.01
+    psig=0.01
+    vshift=0.
+    isigma=-1
+    Fimmobile=(128./315.)       ! Now normalized *psig**2 
+! Because frcomplex includes only one velocity direction.
+    nvs=1
+    call tsparse(ormax,oi,nvs,isw)
+!    write(*,*)'vshift,psig,nvs',vshift,psig,nvs
+    psig=abs(psig)
+    vsmax=vshift
+    ol=.4
+    nl=int(nor*min(ol/ormax,1.))
+    do j=1,nvs
+       if(nvs.gt.1)vshift=vsmax*(j-1.)/(nvs-1.)
+       do i=1,nor
+          or(i)=ormax*(i-.9)/(nor-.9)
+! Here's where we invert to do imaginary omega
+!          omegag=complex(or(i),oi)
+          omegag=complex(oi,or(i))
+          omegaonly=omegag
+          call FgRepelEint(frcomplex(i),isigma)
+          if(.not.real(frcomplex(i)).lt.1.e20)then
+             write(*,*)'Frepelofomega Force Nan?',&
+                  i,omegag,omegaonly,frcomplex(i),psig,isigma
+             stop
+          endif
+! Test of ionforce, which takes electron omega arguments, whereas omega
+! here has been specified in ion units.
+          call ionforce(fion(i),omegag/sqrt(1836.),omegag/sqrt(1836.),psig,vshift,1836.)
+          fion(i)=fion(i)/psig**2/2.
+          frcomplex(i)=frcomplex(i)/psig**2
+          diffmax=max(diffmax,abs(fion(i)-frcomplex(i)))
+          if(j.eq.1)then  !vshift is zero
+             omegag=omegag/sqrt(1836.)
+             omegaonly=omegag
+             psig=-psig;
+             call FgAttractEint(felectron(i),isigma)
+             felectron(i)=felectron(i)/psig**2
+             psig=psig/10.
+             call FgAttractEint(felec2(i),isigma)
+             felec2(i)=felec2(i)/psig**2
+             psig=-psig*10.;
+             omegag=omegag*sqrt(1836.)
+             omegaonly=omegag
+!             write(*,*)felectron(i),fion(i)
+          endif
+       enddo
+!       write(*,*)'diffmax=',diffmax
+       if(j.eq.1)then
+!          write(*,*)'Fimmobile/2=',Fimmobile,' Fdirect=',frcomplex(nor)
+          call pltinit(0.,or(nor),-0.8*Fimmobile,1.2*Fimmobile)
+          call charsize(.02,.02)
+          call axis
+          call axptset(0.,1.)
+          call ticrev
+          call altxaxis(1./sqrt(1836.),1./sqrt(1836.))
+          call legendline(.35,1.13,258,'imag(!Aw!@)/!Aw!@!dpe!d')
+          call axptset(1.,0.)
+          call ticlabtog
+          call altyaxis(1.,1.)
+          call ticlabtog
+          call axptset(0.,0.)
+          call ticrev
+          call axlabels('imag(!Aw!@)/!Aw!@!dpi!d','!p!o~!o!qF/!Ay!@!u2!u')
+!          call polymark(ormax,Fimmobile,1,1)
+          call legendline(.7,.05,0,' +!p!o~!o!qF!di!d')
+!          call winset(.true.)
+          call dashset(2)
+          call polyline(or,-real(felectron),nor)
+          call fwrite(psig,iwidth,3,string)
+          call legendline(.1,.12,0,' -!p!o~!o!qF!de!d, !Ay!@='&
+               &//string(1:iwidth))
+          call dashset(3)
+          call polyline(or,-real(felec2),nor)
+          call fwrite(psig/10.,iwidth,3,string)
+          call legendline(.1,.05,0,' -!p!o~!o!qF!de!d, !Ay!@='&
+               &//string(1:iwidth))
+          call dashset(0)
+       endif
+       write(*,'(a,f9.5,a,f9.5)')' vshift=',vshift,' psig=',psig
+       call color(mod(j-1,15)+1)
+       call polyline(or,real(frcomplex),nor)
+       call fwrite(vshift,iwidth,2,string)
+       call jdrwstr(wx2nx(ormax*.95),wy2ny(real(frcomplex(nor))),string(1:iwidth),-1.)
+!       call jdrwstr(wx2nx(ol),wy2ny(imag(frcomplex(nl))),string(1:iwidth),0.)
+!       call polyline(or,imag(frcomplex),nor)
+!       if(j.eq.1)call legendline(.5,.15,0,' imag')
+    enddo
+    call pltend
+  end subroutine Frepelofimagomega
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   subroutine testSumHarm
     use shiftgen
     use shiftmode
@@ -374,14 +473,14 @@
     ormax=.1
     psig=-.1
     call tsparse(ormax,oi,nvs,isw)
+    lioncorrect=.false.
     if(oi.lt.0.00001)oi=.00001
     omegag=complex(ormax,oi)
     omegaonly=omegag
-    write(*,*)'testSumHarm psig                  omegag,              Omegacg'
-    write(*,*)psig,omegag,Omegacg
+    write(*,*)'testSumHarm psig                  omegag,             &
+         & Omegacg',' lioncorrect'
+    write(*,*)psig,omegag,Omegacg,lioncorrect
     isigma=-1
-!    call FgEint(Ftotalg,isigma)  ! Generic call is the same.
-!    write(*,*)'Ftotalg        ',Ftotalg
     call SumHarmonicsg(isigma)
     write(*,*)'FtotalSumg=',Ftotalsumg
     if(psig.lt.0)then
@@ -400,6 +499,7 @@
        write(*,*)'Sum gen        ',FtotalSumg
        write(*,*)'SumM/SumG-1    ',(Ftraptotal+Fpasstotal)/FtotalSumg-1.
     endif
+    lioncorrect=.true.
   end subroutine testSumHarm
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   subroutine tsparse(ormax,oi,nvs,isw)
@@ -417,7 +517,11 @@
        if(argument(1:3).eq.'-oc')read(argument(4:),*)Omegacg
        if(argument(1:3).eq.'-kg')read(argument(4:),*)kg
        if(argument(1:2).eq.'-n')read(argument(3:),*)nvs
-       if(argument(1:2).eq.'-c')call pfset(-3)
+       if(argument(1:2).eq.'-c')then
+          ipfset=-3
+          read(argument(3:),*,err=201,end=201)ipfset
+201       call pfset(ipfset)
+       endif
        if(argument(1:2).eq.'-s')then
           read(argument(3:),*)j
           isw=isw+j
@@ -456,7 +560,7 @@ subroutine ionforce(Fi,omega,omegaon,psiin,vsin,mime)
   isigma=-1
   vshift=vsin
   call FgRepelEint(Ftotalg,isigma)
-  Fi=2.*Ftotalg
+!  Fi=2.*Ftotalg  ! Now in FgRepel itself.
   if(abs(real(omegag)-nint(real(omegag))).lt.1.e-5)then ! Debugging.
      write(*,*)omegag,Ftotalg
   endif
@@ -512,7 +616,8 @@ omegag=complex(ormax,oi)
   isw=isw/2 ! 2
   if(isw-2*(isw/2).eq.1) call testAttract
   isw=isw/2 ! 4
-  if(isw-2*(isw/2).eq.1) call Frepelofomega
+!  if(isw-2*(isw/2).eq.1) call Frepelofomega
+  if(isw-2*(isw/2).eq.1) call Frepelofimagomega
   isw=isw/2 ! 8
   if(isw-2*(isw/2).eq.1) call plotionforce(.01,1.,0.)
   isw=isw/2 ! 16
