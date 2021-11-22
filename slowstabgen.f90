@@ -10,7 +10,7 @@
 program fomegasolve
   real :: kp,kmid
   logical :: lcont=.true.,lplot=.false.,lerase=.false.
-  integer, parameter :: nk=1,noc=1,npsi=5,nvsin=30,nv0=0
+  integer, parameter :: nk=1,noc=1,npsi=8,nvsin=21,nv0=0
   real :: Omegacarr(noc),karr(nk),psiparray(npsi),vsinarray(nv0:nvsin)
   real :: ormax,oimax
   complex :: omegasolve(nv0:nvsin,npsi),omegap
@@ -68,6 +68,7 @@ program fomegasolve
         vsin=vsmin+(vsmax-vsmin)*(iv-1.)/(nvsin-.99999)
         if(iv.eq.0)vsin=0.
         if(ip.eq.1)vsinarray(iv)=vsin
+        omegap=complex(0.7*sqrt(psip)/8.,.7*sqrt(psip)/8./(1.+vsin))
         call iterfindroot(psip,vsin,Omegacp,omegap,isigma,lplot,ires)
         if(ires.ne.0)omegasolve(iv,ip)=omegap/sqrt(psip)
         write(*,'(2f8.4,i3,$)')psip,vsin,ires
@@ -88,10 +89,10 @@ program fomegasolve
      call color(15)
      call fwrite(psiparray(ip),iwidth,3,string)
      call dashset(ip-1)
-     call legendline(.65,.95-.07*ip,0,' '//string(1:iwidth))
+     call legendline(.65,.95-.05*ip,0,' '//string(1:iwidth))
      call color(1)
      call polyline(vsinarray,real(omegasolve(:,ip)),(nvsin+1-nv0))
-     if(ip.eq.1)call legendline(.65,.4,258,'real(!Aw!@)/!Ay!@!u1/2!u')
+     if(ip.eq.1)call legendline(.65,.5,258,'real(!Aw!@)/!Ay!@!u1/2!u')
      call color(4)
      call polyline(vsinarray,imag(omegasolve(:,ip)),(nvsin+1-nv0))
      if(ip.eq.1)call legendline(.1,.9,258,'imag(!Aw!@)/!Ay!@!u1/2!u')
@@ -129,7 +130,6 @@ subroutine parsefoarguments(psip,vsin,ormax,oimax,Omegacmax,lerase,lcont,lplot)
 end subroutine parsefoarguments
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 subroutine fomegacont(psip,Omegacp,Typ,kp,vsin,lcont,lplot,err,ormax,oimax,lerase)
-!  use shiftgen
   logical :: lerase
   complex :: omegap      ! omegag surrogate maybe read from file
   integer, parameter ::   nor=21,noi=21
@@ -144,7 +144,7 @@ subroutine fomegacont(psip,Omegacp,Typ,kp,vsin,lcont,lplot,err,ormax,oimax,leras
   logical :: lions=.true.,lreadit=.false.
   character*30 string,filename,argument
   real ormax,oimax
-
+  
   ! Create filename in accordance with passed parameters
   write(filename,'(a,2i2.2,a,i3.3,a,i3.3,a,i3.3,a)')   &
        'F',nor,noi, &
@@ -195,11 +195,12 @@ subroutine fomegacont(psip,Omegacp,Typ,kp,vsin,lcont,lplot,err,ormax,oimax,leras
            do ioi=1,noi
               oi(ioi)=(ioi-1+dioi)*oimax/(noi-1+dioi)
               omegacomplex(ior,ioi)=complex(or(ior),oi(ioi))
-              call electronforce(Ftcomplex(ior,ioi),omegacomplex(ior,ioi)&
-                   ,Omegacp,psip,isigma)
+              call electronforce(Ftcomplex(ior,ioi),omegacomplex(ior&
+                   &,ioi),omegacomplex(ior,ioi) ,Omegacp,psip,vsin,isigma)
               if(lions)then
-                 call ionforce(Fi,omegacomplex(ior,ioi),Omegacp,&
-                      psip,vsin,isigma)
+                 call ionforce(Fi,omegacomplex(ior,ioi)&
+                      &,omegacomplex(ior,ioi),Omegacp, psip,vsin&
+                      &,isigma)
               endif
               Ficomplex(ior,ioi)=Fi
               forcecomplex(ior,ioi)=Ftcomplex(ior,ioi)+Fi
@@ -236,6 +237,7 @@ subroutine fomegacont(psip,Omegacp,Typ,kp,vsin,lcont,lplot,err,ormax,oimax,leras
   endif
      
 ! Find root and plot it converging (omegag is set to found omegap implicitly)  
+!  omegap=complex(0.7*sqrt(psip)/8.,1.*sqrt(psip)/8./(1.+vsin))
   call iterfindroot(psip,vsin,Omegacp,omegap,isigma,lplot,ires)
   write(*,*)'Eigenfrequency=',omegap
   if(lplot)     call pltend
@@ -307,9 +309,9 @@ subroutine iterfindroot(psip,vsin,Omegacp,omegap,isigma,lplot,ires)
   complex :: omegap,  Fec,Fic,Fsum
      zoif=.001  ! Iteration minimum oi limit factor.
      nzo=0
-     omegap=complex(0.7*sqrt(psip)/8.,.9*sqrt(psip)/8./(1.+vsin))
-     call electronforce(Fec,omegap,Omegacp,psip,isigma)
-     call ionforce(Fic,omegap,Omegacp,psip,vsin,isigma)
+!     omegap=complex(0.7*sqrt(psip)/8.,.9*sqrt(psip)/8./(1.+vsin))
+     call electronforce(Fec,omegap,omegap,Omegacp,psip,vsin,isigma)
+     call      ionforce(Fic,omegap,omegap,Omegacp,psip,vsin,isigma)
      Fsum=Fec+Fic
      do i=1,12
         ires=i
@@ -318,6 +320,7 @@ subroutine iterfindroot(psip,vsin,Omegacp,omegap,isigma,lplot,ires)
            call polymark(max(real(omegap),-2e-3),imag(omegap),1,ichar('0')+i)
         endif
         call complexnewton(Fsum,omegap,err,psip,isigma,vsin,Omegacp)
+        if(.not.abs(omegap).lt.1.e6)write(*,*)'Iterfindroot',i,psip,vsin,omegap
         if(imag(omegap).lt.zoif*sqrt(psip))then
            nzo=nzo+1
            if(nzo.ge.nunconv)then
@@ -329,8 +332,13 @@ subroutine iterfindroot(psip,vsin,Omegacp,omegap,isigma,lplot,ires)
            endif
            omegap=complex(real(omegap),zoif*sqrt(psip))
         endif
-        call electronforce(Fec,omegap,Omegacp,psip,isigma)
-        call ionforce(Fic,omegap,Omegacp,psip,vsin,isigma)
+        if(.not.abs(omegap).lt.1.e3)then
+           ires=0
+           write(*,*)'Iterfind diverging',omegap,err
+           goto 1
+        endif
+        call electronforce(Fec,omegap,omegap,Omegacp,psip,vsin,isigma)
+        call      ionforce(Fic,omegap,omegap,Omegacp,psip,vsin,isigma)
         Fsum=Fec+Fic
         if(lplot)write(*,'(a,i4,5f10.6)')'i,omegap,Fsum,err=',i,omegap,Fsum,err
         if(err.lt..5e-4)goto 1
@@ -352,16 +360,16 @@ subroutine complexnewton(Fsum,omegap,err,psip,isigma,vsin,Omegacp)
   om1=omegap
   ! Calculate the Jacobian's coefficients.
   om2=om1+eps1*abs(real(om1))
-  call electronforce(Fec,om2,Omegacp,psip,isigma)
-  call ionforce(Fic,om2,Omegacp,psip,vsin,isigma)
+  call electronforce(Fec,om2,om2,Omegacp,psip,vsin,isigma)
+  call      ionforce(Fic,om2,om2,Omegacp,psip,vsin,isigma)
   f2=Fec+Fic
 !  write(*,'(6g12.4)')om1,om2,f2
   if(.not.om2-om1.ne.0)stop 'om2-om1=0'
   J11=real(f2-f1)/real(om2-om1)
   J21=imag(f2-f1)/real(om2-om1)
   om3=om1+complex(0.,eps1*imag(om1))
-  call electronforce(Fec,om3,Omegacp,psip,isigma)
-  call ionforce(Fic,om3,Omegacp,psip,vsin,isigma)
+  call electronforce(Fec,om3,om3,Omegacp,psip,vsin,isigma)
+  call      ionforce(Fic,om3,om3,Omegacp,psip,vsin,isigma)
   f3=Fec+Fic
 !  write(*,'(6g12.4)')om1,om3,f3
   if(.not.om3-om1.ne.0)stop 'om3-om1=0'
@@ -473,8 +481,8 @@ subroutine plotionforce(psi,Typ,vsin,Omegacin)
   write(*,*)'psi=',psi,' vsin=',vsin
   do i=1,nfi
      omegaFi(i)=omegamax*(float(i)/nfi)/sqrt(1836.)+complex(0.,.0001)
-     call ionforce(Fiarray(i),omegaFi(i),Omegacin,psi,vsin,isigma)
-     call electronforce(Fearray(i),omegaFi(i),Omegacin,psi,-1)
+     call ionforce(Fiarray(i),omegaFi(i),omegaFi(i),Omegacin,psi,vsin,isigma)
+     call electronforce(Fearray(i),omegaFi(i),omegaFi(i),Omegacin,psi,vsin,-1)
      Ftotarray(i)=Fearray(i)+Fiarray(i)
   enddo
   call minmax(Ftotarray,2*nfi,fmin,fmax)
@@ -499,40 +507,3 @@ subroutine plotionforce(psi,Typ,vsin,Omegacin)
   call pltend
 end subroutine plotionforce
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-! Routines that use shiftgen and are thus the interface.
-!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-subroutine ionforce(Fi,omega,Omegacin,psiin,vsin,isigma)
-  use shiftgen
-  complex :: Fi,omega  !,Ftotalg
-  real :: psiin,vsin,Omegacin
-  real, parameter :: mime=1836
-  omegag=omega*sqrt(mime)
-  Omegacg=Omegacin*sqrt(mime)
-  omegaonly=omegag
-  psig=psiin
-  vshift=vsin
-  call SumHarmonicsg(isigma)
-  Fi=Ftotalsumg
-! Undo changes
-  omegag=omega
-  omegaonly=omegag
-  Omegacg=Omegacg/sqrt(mime)
-end subroutine ionforce
-!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-subroutine electronforce(Felec,omegain,Omegacp,psiin,isigma)
-  use shiftgen
-  complex :: omegain,Felec
-  omegag=omegain
-  omegaonly=omegag  ! Ignoring kg for now. 
-  Omegacg=Omegacp
-  psig=-psiin; call SumHarmonicsg(isigma); psig=-psig
-  Felec=Ftotalsumg
-end subroutine electronforce
-!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-subroutine plotfv(vsin)
-  use shiftgen
-  vshift=vsin
-  call fvinfplot
-end subroutine plotfv
-!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!

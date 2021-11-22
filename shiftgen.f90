@@ -41,7 +41,8 @@ module shiftgen
   complex :: omegag=(1.,0.),sqm1g=(0.,1.),Ftot,dFordirect
   complex :: omegadiff,omegaonly
   real :: psig=.1,Wg,zm=10.,v0,z0,z1,z2,zR,kg=0.,Omegacg=5.
-  real :: vshift=0.,vrshift=0.,Tinf=1.,Tperpg=1.
+  real :: vshift=0.,vrshift=0.  ! The shape of ion distribution.
+  real :: Tinf=1.,Tperpg=1.
   integer :: ivs,iws
   integer, parameter :: ngz=100,nge=200,nhmax=50
   integer :: iwpowg=2,nharmonicsg
@@ -60,6 +61,8 @@ module shiftgen
 ! Total forces
   complex :: Ftotalmode
   complex :: Ftotalrg,Ftotalpg,Ftotalsumg
+! Ratio of mass of ion to mass of electron
+  real :: rmime=1836.
 ! Whether to apply a correction to the trapped species
   logical :: lioncorrect=.true.
 contains
@@ -93,7 +96,7 @@ contains
        endif
        z1=0.
     else  
-       write(*,*)'ERROR psi is zero'
+       write(*,*)'ERROR psi is zero or worse',psig
        stop
     endif
     do i=0,ngz
@@ -380,7 +383,7 @@ contains
           write(*,*)fe,dfe,dfeperp
           stop
        endif
-! Multiply by 2. to account for \pm v_\psi.
+! No longer Multiply by 2. to account for \pm v_\psi.
 !       Ftotal=Ftotal+2.*Ftrapg(i)       ! Add to Ftotal integral.
        Ftotal=Ftotal+Ftrapg(i)       ! Add to Ftotal integral.
        if(lcompare)call  Ftrapcompare(i,dfe,dfeperp,obi,resdenom&
@@ -500,11 +503,13 @@ contains
        vsa=vrshift     ! The vshift of the reflected species.
        denem1=(-1.+(vsa/vsx)**ri) /(1.+0.25*psig+vsa**2*(vsa/(vsx +(3.3&
             &/vsa)**1.5))**ri)
-       fdfac=(1-denem1*psig)
+!       fdfac=(1-denem1*psig)   ! error.
+       fdfac=(1-denem1)
        dfdWptrap=dfdWptrap*fdfac
 ! ftilde=fe-fflat is multiplied by fdfac. fflat=1/sqrt(2pi)
        fflat=1/sqrt(2.*pig)
        fe=fflat+fdfac*(fe-fflat)
+!       write(*,'(a,4f10.4)')'lioncorrect',vrshift,denem1,fdfac
     endif
 end function dfdWptrap
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -571,7 +576,7 @@ end function dfdWptrap
     vsa=vrshift
     denem1=(-1.+(vsa/vsx)**ri) /(1.+0.25*psig+vsa**2*(vsa/(vsx +(3.3&
          &/vsa)**1.5))**ri)
-    dfeval=dfeval*(1-denem1*psig)
+    dfeval=dfeval*(1-denem1)
   end subroutine dfefac
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   include 'LofW.f90'    ! Obsolete; only for testing.
@@ -581,3 +586,49 @@ end module shiftgen
 ! The standard routines for comparison are:
 include 'compareroutines.f90'
 ! They can be replaced by dummies for compilation without shiftmode.
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+! Routines that use shiftgen and are thus the interface.
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+subroutine ionforce(Fi,omega,omegaonlyp,Omegacin,psiin,vsin,isigma)
+! Input parameters are in electron units, and produce no permanent
+! changes to shiftgen internal parameters.
+  use shiftgen
+  complex :: Fi,omega,omegaonlyp,omg,omy
+  real :: psiin,vsin,Omegacin
+  omg=omegag;omy=omegaonly;omc=Omegacg;pg=psig;vs=vshift
+  omegag=omega*sqrt(rmime)
+  Omegacg=Omegacin*sqrt(rmime)
+  omegaonly=omegaonlyp*sqrt(rmime)
+  psig=psiin
+  vshift=vsin
+  call SumHarmonicsg(isigma)
+  Fi=Ftotalsumg ! Hack test /2.
+! Undo changes
+  omegag=omg;omegaonly=omg;Omegacg=omc;psig=pg;vshift=vs
+end subroutine ionforce
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+subroutine electronforce(Felec,omegain,omegaonlyp,Omegacp,psiin,vsin,isigma)
+! Inputs in electron units except for vsin in ion units. No permanent
+! changes to shiftgen parameters. vshift is set temporarily to zero,
+! and vrshift to ion shift vsin.
+  use shiftgen
+  complex :: omegain,omegaonlyp,Felec
+  omegag=omegain
+  omegaonly=omegaonlyp
+  Omegacg=Omegacp
+  vr=vrshift
+  vrshift=vsin   ! lioncorrect value
+  vs=vshift
+  vshift=0.
+  psig=-psiin; call SumHarmonicsg(isigma); psig=-psig
+  Felec=Ftotalsumg
+  vshift=vs      ! Restore vshift and vrshift.
+  vrshift=vr
+end subroutine electronforce
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+subroutine plotfv(vsin)
+  use shiftgen
+  vshift=vsin
+  call fvinfplot
+end subroutine plotfv
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
