@@ -9,7 +9,7 @@
 
 program fomegasolve
   real :: kp,kmid
-  logical :: lcont=.true.,lplot=.false.,lerase=.false.
+  logical :: lcont=.true.,lplot=.false.,lerase=.false.,lTiscan=.false.
   integer, parameter :: nk=1,noc=1,npsi=8,nvsin=21,nv0=0
   real :: Omegacarr(noc),karr(nk),psiparray(npsi),vsinarray(nv0:nvsin)
   real :: ormax,oimax
@@ -27,7 +27,7 @@ program fomegasolve
   vsin=1.25         ! Maxwellian ion component velocity shift
   ormax=0.
   oimax=0.
-  call parsefoarguments(psip,vsin,ormax,oimax,Omegacmax,lerase,lcont,lplot)
+  call parsefoarguments(psip,vsin,ormax,oimax,Omegacmax,lerase,lcont,lplot,Ti,lTiscan)
   if(ormax.eq.0)then
      ormax=.3*sqrt(psip)
   endif
@@ -36,78 +36,137 @@ program fomegasolve
      if(vsin.le.1.2)oimax=.3*sqrt(psip)
      if(vsin.le..9)oimax=.4*sqrt(psip)
   endif
-! This loop is the contouring of psimax and vsmax case.  
   if(lplot)then
-  do ik=1,nk
-     if(nk.gt.1)then
-        kp=kmid*(1.+rangek*(2.*(ik-1.)/max(1.,nk-1.)-1.))
-     else
-        kp=kmid
-     endif
-     karr(ik)=kp/sqrt(psip)
+! contouring of psimax and vsmax case.       
+     do ik=1,nk
+        if(nk.gt.1)then
+           kp=kmid*(1.+rangek*(2.*(ik-1.)/max(1.,nk-1.)-1.))
+        else
+           kp=kmid
+        endif
+        karr(ik)=kp/sqrt(psip)
 !     write(*,*)'kp=',kp,' karr=',karr(ik)
-     do ioc=1,noc
-        Omegacp=ioc*Omegacmax/noc
-        Omegacarr(ioc)=Omegacp/sqrt(psip)
-        call fomegacont(psip,Omegacp,Typ,kp,vsin,lcont,lplot,err&
-             &,ormax,oimax,lerase)
+        do ioc=1,noc
+           Omegacp=ioc*Omegacmax/noc
+           Omegacarr(ioc)=Omegacp/sqrt(psip)
+           call fomegacont(psip,Omegacp,Typ,kp,vsin,lcont,lplot,err&
+                &,ormax,oimax,lerase)
+        enddo
      enddo
-  enddo
+  elseif(lTiscan)then
+! omega versus Ti at several vsin
+
+     Timax=Ti
+     Timin=.5
+     psip=.05
+     omegasolve=0.
+     nvs=4
+     write(*,*)' psip   vshift   Ti    it     omega'
+     do ip=1,nvs ! Really this is vs iterations here
+        vs=vsin*(ip-1)/(nvs-1.)
+        psiparray(ip)=vs
+        do iv=1,nvsin  ! Really this is Ti iterations
+           Ti=Timin+(Timax-Timin)*(iv-1.)/(nvsin-.99999)
+           if(ip.eq.1)vsinarray(iv)=Ti
+           omegap=complex(0.7*sqrt(psip)/8.,.7*sqrt(psip)/8./(1.+vsin))
+           call Tset(1.,Ti)
+           call iterfindroot(psip,vs,Omegacp,omegap,isigma,lplot,ires)
+           if(ires.ne.0)omegasolve(iv,ip)=omegap/sqrt(psip)
+           write(*,'(3f8.4,i3,$)')psip,vs,Ti,ires
+           write(*,*)omegap
+        enddo
+     enddo
+     call pltinit(vsinarray(1),vsinarray(nvsin),0.,.3+psip)
+     call charsize(.019,.019)
+     call axis; call axis2
+     call axlabels('T!di!d','!Aw!@/!Ay!@!u1/2!u')
+     call winset(.true.)
+     call legendline(.55,.95,258,'v!ds!d=')
+     iline=1
+     do ip=1,nvs
+        call color(ip)
+!        call polyline(vsinarray(1),imag(omegasolve(nvsin,ip))&
+!             &*(vsinarray(nvsin)/vsinarray(1:nvsin)),nvsin)
+        call fwrite(psiparray(ip),iwidth,2,string)
+        call dashset(2*ip-2)
+        call polyline(vsinarray(1),real(omegasolve(1:,ip)),nvsin)
+        if(real(omegasolve(1,ip)).gt.0.001)then
+           call legendline(.5,.95-.05*iline,0,' '//string(1:iwidth)&
+                &//' !Aw!@!dr!d')
+           iline=iline+1
+        endif
+        call dashset(2*ip-1)
+        call polyline(vsinarray(1),imag(omegasolve(1:,ip)),nvsin)
+        call legendline(.5,.95-.05*iline,0,' '//string(1:iwidth)//' !Aw!@!di!d')
+        iline=iline+1
+        call dashset(0)
+     enddo
+     call pltend
+     
   else
-! The following loops are for psip and vsin plots.
-  psipmax=psip
-  vsmax=vsin
-  Omegacp=Omegacmax
-  lplot=.false.
-  vsmin=0.5
-  omegasolve=0.
-  do ip=1,npsi
-     psip=ip*psipmax/npsi
-     psiparray(ip)=psip
-     do iv=nv0,nvsin
-        vsin=vsmin+(vsmax-vsmin)*(iv-1.)/(nvsin-.99999)
-        if(iv.eq.0)vsin=0.
-        if(ip.eq.1)vsinarray(iv)=vsin
-        omegap=complex(0.7*sqrt(psip)/8.,.7*sqrt(psip)/8./(1.+vsin))
-        call iterfindroot(psip,vsin,Omegacp,omegap,isigma,lplot,ires)
-        if(ires.ne.0)omegasolve(iv,ip)=omegap/sqrt(psip)
-        write(*,'(2f8.4,i3,$)')psip,vsin,ires
-        write(*,*)omegap
+! omega versus vsin plots at various psi.
+     psipmax=psip
+     vsmax=vsin
+     Omegacp=Omegacmax
+     lplot=.false.
+     if(nvsin.lt.15)then
+        vsmin=0.5
+     else
+        vsmin=0.1
+     endif
+     omegasolve=0.
+     do ip=1,npsi
+        psip=ip*psipmax/npsi
+        psiparray(ip)=psip
+        do iv=nv0,nvsin
+           vsin=vsmin+(vsmax-vsmin)*(iv-1.)/(nvsin-.99999)
+           if(iv.eq.0)vsin=0.
+           if(ip.eq.1)vsinarray(iv)=vsin
+           omegap=complex(0.7*sqrt(psip)/8.,.7*sqrt(psip)/8./(1.+vsin))
+           call iterfindroot(psip,vsin,Omegacp,omegap,isigma,lplot,ires)
+           if(ires.ne.0)omegasolve(iv,ip)=omegap/sqrt(psip)
+           write(*,'(2f8.4,i3,$)')psip,vsin,ires
+           write(*,*)omegap
+        enddo
      enddo
-  enddo
 !  call minmax(omegasolve,2*npsi*nvsin,ommin,ommax)
 !  call pltinit(vsinarray(nv0),vsinarray(nvsin),0.,ommax*1.1)
 ! Now scaled version  
 ! Uncorrected  call pltinit(vsinarray(nv0),vsinarray(nvsin),0.,.34)
-  call pltinit(vsinarray(nv0),vsinarray(nvsin),0.,.3+psip)
-  call charsize(.019,.019)
-  call axis; call axis2
-  call axlabels('!Bv!ds!d!@','!Aw!@/!Ay!@!u1/2!u')
-  call winset(.true.)
-  call legendline(.7,.95,258,'!Ay!@=')
-  do ip=1,npsi
-     call color(15)
-     call fwrite(psiparray(ip),iwidth,3,string)
-     call dashset(ip-1)
-     call legendline(.65,.95-.05*ip,0,' '//string(1:iwidth))
-     call color(1)
-     call polyline(vsinarray,real(omegasolve(:,ip)),(nvsin+1-nv0))
-     if(ip.eq.1)call legendline(.65,.5,258,'real(!Aw!@)/!Ay!@!u1/2!u')
-     call color(4)
-     call polyline(vsinarray,imag(omegasolve(:,ip)),(nvsin+1-nv0))
-     if(ip.eq.1)call legendline(.1,.9,258,'imag(!Aw!@)/!Ay!@!u1/2!u')
-     call dashset(0)
-  enddo
-  call color(0)
-  call pltend
+     call pltinit(vsinarray(nv0),vsinarray(nvsin),0.,.3+psipmax)
+     call charsize(.019,.019)
+     call axis; call axis2
+     call axlabels('!Bv!ds!d!@','!Aw!@/!Ay!@!u1/2!u')
+     if(Ti.ne.1.)then
+        call fwrite(Ti,iwidth,1,string)
+        call legendline(.05,.07,258,'T!di!d='//string(1:iwidth))
+     endif
+     call winset(.true.)
+     call legendline(.7,.95,258,'!Ay!@=')
+     do ip=1,npsi
+        call color(15)
+        call fwrite(psiparray(ip),iwidth,3,string)
+        call dashset(ip-1)
+        call legendline(.65,.95-.05*ip,0,' '//string(1:iwidth))
+        call color(1)
+        call polyline(vsinarray,real(omegasolve(:,ip)),(nvsin+1-nv0))
+        if(ip.eq.1)call legendline(.65,.5,258,'real(!Aw!@)/!Ay!@!u1/2!u')
+        call color(4)
+        call polyline(vsinarray,imag(omegasolve(:,ip)),(nvsin+1-nv0))
+        if(ip.eq.1)call legendline(.1,.9,258,'imag(!Aw!@)/!Ay!@!u1/2!u')
+        call dashset(0)
+     enddo
+     call color(0)
+     call pltend
   endif
 end program fomegasolve
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-subroutine parsefoarguments(psip,vsin,ormax,oimax,Omegacmax,lerase,lcont,lplot)
+subroutine parsefoarguments(psip,vsin,ormax,oimax,Omegacmax,lerase,lcont,lplot,Ti,lTiscan)
   character*20 argument
-  logical :: lerase,lcont,lplot
+  logical :: lerase,lcont,lplot,lTiscan
   ipfset=3 ! default
+  Ti=1.
   do i=1,iargc()
      call getarg(i,argument)
      if(argument(1:2).eq.'-p')read(argument(3:),*)psip
@@ -115,8 +174,14 @@ subroutine parsefoarguments(psip,vsin,ormax,oimax,Omegacmax,lerase,lcont,lplot)
      if(argument(1:3).eq.'-or')read(argument(4:),*)ormax
      if(argument(1:3).eq.'-oi')read(argument(4:),*)oimax
      if(argument(1:3).eq.'-oc')read(argument(4:),*)Omegacmax
+     if(argument(1:3).eq.'-Ti')then
+        read(argument(4:),*)Ti
+        write(*,'(a,f8.2)')'Setting Ti to',Ti
+        call Tset(1.,Ti)
+     endif
      if(argument(1:3).eq.'-lc')lcont=.not.lcont
      if(argument(1:3).eq.'-lp')lplot=.not.lplot
+     if(argument(1:3).eq.'-lT')lTiscan=.not.lTiscan
      if(argument(1:2).eq.'-e')lerase=.not.lerase
      if(argument(1:2).eq.'-c')ipfset=-3
      if(argument(1:2).eq.'-h')goto 1
@@ -125,7 +190,7 @@ subroutine parsefoarguments(psip,vsin,ormax,oimax,Omegacmax,lerase,lcont,lplot)
   return
 1 write(*,*)'-p psi, -vs vshift, -or -oi real, imag omega,',&
        ' -c no-stopping, -e erase file'
-  write(*,*)'-lp toggle on contours' 
+  write(*,*)'-Ti ion tempr, -oc Omegac -lp toggle on contours, -lt toggle Tiscan' 
   stop
 end subroutine parsefoarguments
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!

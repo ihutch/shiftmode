@@ -304,7 +304,7 @@
     ormax=10.   !defaults
     oi=0.01
     psig=0.01
-    vshift=0.
+    vs=0.
     isigma=-1
     Omegacin=10.
     Fimmobile=(128./315.)       ! Now normalized *psig**2 
@@ -455,8 +455,10 @@
     use shiftgen
     use shiftmode
 !    complex :: Ftotalg
-    ormax=.1
-    psig=-.1
+! Defaults
+    ormax=.1    
+    ps=-.1
+    vs=0.
     call tsparse(ormax,oi,nvs,isw,vs,ps)
     lioncorrect=.false.
     if(oi.lt.0.00001)oi=.00001
@@ -474,7 +476,7 @@
        omegad=omega
        Omegac=Omegacg
        k=kg
-       write(*,*)omega,Omegac,k
+!       write(*,*)omega,Omegac,k
        write(*,*)'testSumHarm: Calling shiftmode initialize'
        call initialize
        call SumHarmonics

@@ -42,9 +42,10 @@ module shiftgen
   complex :: omegadiff,omegaonly
   real :: psig=.1,Wg,zm=10.,v0,z0,z1,z2,zR,kg=0.,Omegacg=5.
   real :: vshift=0.,vrshift=0.  ! The shape of ion distribution.
-  real :: Tinf=1.,Tperpg=1.
+  real :: Tinf=1.,Tperpg=1.,Torepel=1.
+! Tinf is really the reference (attracted). Torepel the other/repelled species.
   integer :: ivs,iws
-  integer, parameter :: ngz=100,nge=200,nhmax=50
+  integer, parameter :: ngz=100,nge=200,nhmax=80
   integer :: iwpowg=2,nharmonicsg
   real,parameter :: pig=3.1415926
 ! Spatial Arrays
@@ -170,7 +171,7 @@ contains
 ! done as exp(-i omega(tau-t)) dtau = d[exp()]/(-i omega)
 ! The result needs to be multiplied by df/dWpar.
     complex :: dForceg,CPfactor,exptbb2
-    
+
     Wg=Wgi
     call makezg(isigma) ! Sets various time array values.
     vpsig=vg(-ngz)            ! Untrapped default ...
@@ -193,6 +194,7 @@ contains
           if(ips.le.0..or.zR.eq.0)iws=i   ! Attracted or unreflected
        endif
        if(.not.dtau.lt.1e6)then           ! Test for NAN error
+          write(*,*)'In Fdirect',Wg
           write(*,*)i,'dtau=',dtau,v0,vg(i-1),vg(i),zR,Wg,vpsig,phigp
           stop
        endif
@@ -231,11 +233,11 @@ contains
        write(*,*)omegaonly,omegag
        idone=idone+1
     endif
-!    Emaxg=4.*Tinf+vshift**2  ! This was inadequate.
     Emaxg=2.5*(sqrt(2*Tinf)+vshift)**2
     call FgPassingEint(Ftotalpg,isigma,Emaxg)
     call FgReflectedEint(Ftotalrg,isigma)
     Ftotalg=(Ftotalpg+Ftotalrg)*2. ! Both v-directions
+    Ftotalg=Ftotalg*Tinf/Torepel   ! Correct for ion Temperature.
   end subroutine FgRepelEint
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   subroutine FgPassingEint(Ftp,isigma,Emaxg)
@@ -250,6 +252,7 @@ contains
     do i=1,nge  ! Passing, corrected for psig sign.
        Wgarray(i)=max(psig,0.)+Emaxg*(i/float(nge))**ippow
        vinfarrayp(i)=-isigma*sqrt(2.*Wgarray(i))
+!       write(*,*)'Wgarray(i),Emaxg,psig,ippow',Wgarray(i),Emaxg,psig,ippow
        call Fdirect(Wgarray(i),isigma,Forcegarray(i))
        dfe=dfdWpar(vinfarrayp(i),fvinf) ! fparallel slope and value
 !       write(*,*)'vinfarrayp(i),dfe,fvinf',vinfarrayp(i),dfe,fvinf
@@ -315,6 +318,7 @@ contains
        idone=idone+1
     endif
     Emaxg=4.*Tinf+vshift**2
+!    write(*,*)'FgAttractEint',Emaxg,Tinf,vshift
     call FgPassingEint(Ftotalpg,isigma,Emaxg)
     call FgTrappedEint(Ftotalrg,-1/Tperpg,1.,isigma)
  ! Hacked dfperpdWperp, fperp, because only Maxwellian perp distrib.    
@@ -420,29 +424,33 @@ contains
     real :: EIm(0:nhmax),xit,vymax,hnum
     integer :: m,ncalc
     real :: Oceff   ! The effective Omegacg
-    logical :: lbess=.false.
+    logical :: lbess=.true.
 ! The maximum needed perp velocity, such that kg*vymax/Oc=nharmonicsg
     vymax=3.5*sqrt(2.*Tperpg)
     Oceff=max(1.e-6,max(Omegacg,kg*vymax/nhmax)) ! Don't allow zero Oceff.
 ! How many harmonics do we actually need? Nominally:
-    hnum=kg*vymax/Oceff
-! If nharmonicsg is small, then use rather more for accuracy.
+    hnum=kg*vymax/Oceff                          ! This will not exceed nhmax
+! If hnum is small, then use rather more for accuracy.
     nharmonicsg=min(nhmax,int(hnum*(1.+3./(hnum+1.))))
     xit=kg*sqrt(Tperpg)/Oceff
-!    write(*,*)vymax,hnum,xit
+    write(*,*)'kg,vymax,hnum,xit',kg,vymax,hnum,xit
 ! Calculate the Integer[0.] exp*I[2] Bessel functions 0 to nharmonicsg
     call RIBESL(xit**2,0.,nharmonicsg+1,2,EIm,ncalc)
-    if(.not.ncalc.eq.nharmonicsg+1)then ! All orders not calculated correctly.  
+    if(.not.ncalc.eq.nharmonicsg+1)then ! All orders not calculated correctly.
        write(*,'(a,i3,a,i3,a)')'Bessel functions',ncalc,' of',nharmonicsg+1, &
        ' are precise. Others may be irrelevant.' 
+    endif
+    if(.not.(EIm(1).lt.1.e6))then
+       write(*,*)'EIm NAN?',ncalc
+       write(*,*)EIm
     endif
 ! m=0 always used.! fy is Maxwellian.
 ! But the fywy,fy need to be fixed in inner routines.
     omegaonly=omegag
     call FgEint(Fpg(0),isigma)
 !    write(*,*)'SumHarmonicsg: Oceff,nharmonicsg=',Oceff,nharmonicsg !,hnum
-    if(lbess)write(*,'(a,e11.4,''('',2e12.4,'')'',i4)')&
-         ' EIm(0),Ftt(0)  =',EIm(0),Fpg(0),nharmonicsg
+    if(lbess.and.nharmonicsg.gt.0)write(*,'(a,e11.4,''('',2e12.4,'')'',i4)')&
+         ' EI(0),Ftt(0)  =',EIm(0),Fpg(0),nharmonicsg
     Ftotalsumg=Fpg(0)*EIm(0)
     do m=1,nharmonicsg
        omegag=omegaonly+m*Oceff
@@ -457,8 +465,8 @@ contains
           call FgEint(Fpg(-m),isigma)
           Ftotalsumg=Ftotalsumg+Fpg(-m)*EIm(m)
        endif
-       if(lbess)write(*,'(a,e11.4,''('',2e12.4,'')('',2e12.4,'')'')')&
-            ' EIm(m),Fpg(+-m)=',EIm(m),Fpg(m),Fpg(-m)
+       if(lbess)write(*,'(a,i2,a,e11.4,''('',2e12.4,'')('',2e12.4,'')'')')&
+            ' EI(',m,'),Fpg(+-m)=',EIm(m),Fpg(m),Fpg(-m)
     enddo
     omegag=omegaonly
   end subroutine SumHarmonicsg
@@ -468,14 +476,17 @@ contains
 ! The derivative of the distant distribution func wrt energy W at 
 ! velocity vinf, in the rest frame of the hole. fvinf is returned the f(v). 
 ! Example. Maxwellian of temperature T. f=exp(-vinv^2/2T)/sqrt(2 pi T)
-!    dfdWpar=-exp(-vinf**2/(2.*Tinf))/Tinf/sqrt(2.*3.1415926*Tinf)
+!    dfdWpar=-exp(-vinf**2/(2.*T))/T/sqrt(2.*3.1415926*T)
 ! Two half-density Maxwellians symmetrically shifted by vshift
 ! f=0.5*(exp(-(vinv-vshift)^2/2T)+exp(-(vinv+vshift)^2/2T))/sqrt(2 pi T))
-    e1=exp(-(vinf-vshift)**2/(2.*Tinf))
-    e2=exp(-(vinf+vshift)**2/(2.*Tinf))
-    fvinf=0.5*(e1+e2)/sqrt(2.*3.1415926*Tinf)
+! Even though for ions the temperature Torepel might be different from
+! Tinf, we ignore that fact here, and correct for it in FgRepelEint
+    Tp=Tinf
+    e1=exp(-(vinf-vshift)**2/(2.*Tp))
+    e2=exp(-(vinf+vshift)**2/(2.*Tp))
+    fvinf=0.5*(e1+e2)/sqrt(2.*3.1415926*Tp)
     dfdWpar=0.5*(-e1*(vinf-vshift)-e2*(vinf+vshift)) &
-         &/sign(max(abs(vinf*Tinf),1.e-6),vinf)/sqrt(2.*3.1415926*Tinf)
+         &/sign(max(abs(vinf*Tp),1.e-6),vinf)/sqrt(2.*3.1415926*Tp)
   end function dfdWpar
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 ! If some different form of phi is required. Replace these functions,
@@ -502,7 +513,7 @@ contains
        vsx=1.3+0.2*psig
        vsa=vrshift     ! The vshift of the reflected species.
        denem1=(-1.+(vsa/vsx)**ri) /(1.+0.25*psig+vsa**2*(vsa/(vsx +(3.3&
-            &/vsa)**1.5))**ri)
+            &/vsa)**1.5))**ri)*Tinf/Torepel
 !       fdfac=(1-denem1*psig)   ! error.
        fdfac=(1-denem1)
        dfdWptrap=dfdWptrap*fdfac
@@ -602,7 +613,7 @@ subroutine ionforce(Fi,omega,omegaonlyp,Omegacin,psiin,vsin,isigma)
   psig=psiin
   vshift=vsin
   call SumHarmonicsg(isigma)
-  Fi=Ftotalsumg ! Hack test /2.
+  Fi=Ftotalsumg
 ! Undo changes
   omegag=omg;omegaonly=omg;Omegacg=omc;psig=pg;vshift=vs
 end subroutine ionforce
@@ -625,6 +636,12 @@ subroutine electronforce(Felec,omegain,omegaonlyp,Omegacp,psiin,vsin,isigma)
   vshift=vs      ! Restore vshift and vrshift.
   vrshift=vr
 end subroutine electronforce
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+subroutine Tset(Te,Ti)
+  use shiftgen
+  Tinf=Te
+  Torepel=Ti
+end subroutine Tset
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 subroutine plotfv(vsin)
   use shiftgen

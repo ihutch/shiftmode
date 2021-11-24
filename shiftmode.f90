@@ -473,7 +473,7 @@ contains
     if(Omegac.gt.0)nharmonics=max(4,nint(abs(k*vymax)/Omegac))
     if(.not.nharmonics.le.nvy-1)then   ! B-Field too low.
        if(mod(ifirst,20).eq.0)then
-          write(*,'(a,i4,a,f6.4,a)')'Too many magnetized harmonics', &
+          write(*,'(a,i4,a,f6.4,a)')'TOO MANY MAGNETIZED HARMONICS', &
                nharmonics,' Ignoring Omega_c=',Omegac,' Zero-B calculation.'
        endif
        ifirst=ifirst+1
