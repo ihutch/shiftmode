@@ -381,7 +381,6 @@
     character*30 string
     complex :: omegain,Fe
 !    real :: rmime=1836.
-!    kin=0.
     ormax=10.   !defaults
     oi=0.01
     Omegacin=10.
@@ -456,9 +455,12 @@
     use shiftmode
 !    complex :: Ftotalg
 ! Defaults
+    nvs=1
+    kg=0.
     ormax=.1    
     ps=-.1
     vs=0.
+    lbess=.true.
     call tsparse(ormax,oi,nvs,isw,vs,ps)
     lioncorrect=.false.
     if(oi.lt.0.00001)oi=.00001
@@ -467,6 +469,7 @@
     write(*,*)'testSumHarm psig                  omegag,             &
          & Omegacg',' lioncorrect'
     write(*,*)psig,omegag,Omegacg,lioncorrect
+    if(kg.ne.0.)write(*,*)'kg=',kg
     isigma=-1
     call SumHarmonicsg(isigma)
     write(*,*)'FtotalSumg=',Ftotalsumg
@@ -477,14 +480,15 @@
        Omegac=Omegacg
        k=kg
 !       write(*,*)omega,Omegac,k
-       write(*,*)'testSumHarm: Calling shiftmode initialize'
+       write(*,*)'testSumHarm: Calling shiftmode initialize and (old) SumHarmonics'
        call initialize
        call SumHarmonics
-       write(*,*)'Ftraptotal mode',Ftraptotal
-       write(*,*)'Fpasstotal mode',Fpasstotal
-       write(*,*)'Sum mode       ',Ftraptotal+Fpasstotal
-       write(*,*)'Sum gen        ',FtotalSumg
-       write(*,*)'SumM/SumG-1    ',(Ftraptotal+Fpasstotal)/FtotalSumg-1.
+       write(*,*)'Ftraptotal mode   ',Ftraptotal
+       write(*,*)'Fpasstotal mode   ',Fpasstotal
+       write(*,*)'Sum mode          ',Ftraptotal+Fpasstotal
+       write(*,*)'Sum gen           ',FtotalSumg
+       write(*,'(a,f8.5)')'|SumM/SumG-1| error ',abs((Ftraptotal&
+            &+Fpasstotal)/FtotalSumg-1.)
     endif
     lioncorrect=.true.
   end subroutine testSumHarm

@@ -65,7 +65,7 @@ module shiftgen
 ! Ratio of mass of ion to mass of electron
   real :: rmime=1836.
 ! Whether to apply a correction to the trapped species
-  logical :: lioncorrect=.true.
+  logical :: lioncorrect=.true.,lbess=.false.
 contains
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   subroutine makezg(isigma)
@@ -227,12 +227,6 @@ contains
 ! For symmetric potentials and f(v), the returned Ftotalg can simply be
 ! doubled to give the total force since then it is symmetric in isigma.
     complex Ftotalg
-    integer, save :: idone=0
-    if(idone.eq.0.and.abs(omegaonly-omegag).gt.1.e-6)then
-       write(*,*)'WARNING: omegaonly and omegag are unequal.'
-       write(*,*)omegaonly,omegag
-       idone=idone+1
-    endif
     Emaxg=2.5*(sqrt(2*Tinf)+vshift)**2
     call FgPassingEint(Ftotalpg,isigma,Emaxg)
     call FgReflectedEint(Ftotalrg,isigma)
@@ -311,12 +305,6 @@ contains
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!  
   subroutine FgAttractEint(Ftotalg,isigma)
     complex Ftotalg
-    integer, save :: idone=0
-    if(idone.eq.0.and.abs(omegaonly-omegag).gt.1.e-6)then
-       write(*,*)'WARNING: omegaonly and omegag are unequal.'
-       write(*,*)omegaonly,omegag
-       idone=idone+1
-    endif
     Emaxg=4.*Tinf+vshift**2
 !    write(*,*)'FgAttractEint',Emaxg,Tinf,vshift
     call FgPassingEint(Ftotalpg,isigma,Emaxg)
@@ -425,7 +413,6 @@ contains
     real :: EIm(0:nhmax),xit,vymax,hnum
     integer :: m,ncalc
     real :: Oceff   ! The effective Omegacg
-    logical :: lbess=.true.
 ! The maximum needed perp velocity, such that kg*vymax/Oc=nharmonicsg
     vymax=3.5*sqrt(2.*Tperpg)
     Oceff=max(1.e-6,max(Omegacg,kg*vymax/nhmax)) ! Don't allow zero Oceff.
@@ -434,7 +421,8 @@ contains
 ! If hnum is small, then use rather more for accuracy.
     nharmonicsg=min(nhmax,int(hnum*(1.+3./(hnum+1.))))
     xit=kg*sqrt(Tperpg)/Oceff
-!    write(*,*)'kg,vymax,hnum,xit',kg,vymax,hnum,xit
+!     write(*,'(a,2f8.4,i3,4f7.3)')'kg,vymax,nharm,Oceff,Oc,xit,psig',kg&
+!          &,vymax,nharmonicsg,Oceff,Omegacg,xit,psig
 ! Calculate the Integer[0.] exp*I[2] Bessel functions 0 to nharmonicsg
     ncalc=0
     call RIBESL(xit**2,0.,nharmonicsg+1,2,EIm,ncalc)
@@ -613,7 +601,7 @@ subroutine ionforce(Fi,omega,kin,Omegacin,psiin,vsin,isigma)
 !  write(*,*)'ionforce kg=',kg
   omg=omegag;omc=Omegacg;pg=psig;vs=vshift
   omegag=omega*sqrt(rmime)
-  Omegacg=Omegacin*sqrt(rmime)
+  Omegacg=Omegacin/sqrt(rmime)
   psig=psiin
   vshift=vsin
   call SumHarmonicsg(isigma)
@@ -643,6 +631,11 @@ subroutine electronforce(Felec,omegain,kin,Omegacp,psiin,vsin,isigma)
   vrshift=vr
 end subroutine electronforce
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+subroutine LBessSet
+  use shiftgen
+  lbess=.true.
+end subroutine LBessSet
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 subroutine Tset(Te,Ti)
   use shiftgen
   Tinf=Te
@@ -655,3 +648,7 @@ subroutine plotfv(vsin)
   call fvinfplot
 end subroutine plotfv
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+integer function inharm()
+  use shiftgen
+  inharm=nharmonicsg
+end function inharm
