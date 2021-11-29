@@ -45,7 +45,7 @@ module shiftgen
   real :: Tinf=1.,Tperpg=1.,Torepel=1.
 ! Tinf is really the reference (attracted). Torepel the other/repelled species.
   integer :: ivs,iws
-  integer, parameter :: ngz=100,nge=200,nhmax=80
+  integer, parameter :: ngz=100,nge=200,nhmax=60
   integer :: iwpowg=2,nharmonicsg
   real,parameter :: pig=3.1415926
 ! Spatial Arrays
@@ -419,8 +419,9 @@ contains
   subroutine SumHarmonicsg(isigma)
     implicit none
     integer :: isigma
-    ! Sum harmonic contributions to obtain Forces for specified
-    ! kg, Omegacg. Does the job of v-perp integration. 
+! Sum harmonic contributions to obtain Forces, equiv to v-perp integration. 
+! Perpendicular k-vector kg matters only here, and limits minimum effective
+! Omegacg to Oceff. 
     real :: EIm(0:nhmax),xit,vymax,hnum
     integer :: m,ncalc
     real :: Oceff   ! The effective Omegacg
@@ -433,24 +434,26 @@ contains
 ! If hnum is small, then use rather more for accuracy.
     nharmonicsg=min(nhmax,int(hnum*(1.+3./(hnum+1.))))
     xit=kg*sqrt(Tperpg)/Oceff
-    write(*,*)'kg,vymax,hnum,xit',kg,vymax,hnum,xit
+!    write(*,*)'kg,vymax,hnum,xit',kg,vymax,hnum,xit
 ! Calculate the Integer[0.] exp*I[2] Bessel functions 0 to nharmonicsg
+    ncalc=0
     call RIBESL(xit**2,0.,nharmonicsg+1,2,EIm,ncalc)
     if(.not.ncalc.eq.nharmonicsg+1)then ! All orders not calculated correctly.
        write(*,'(a,i3,a,i3,a)')'Bessel functions',ncalc,' of',nharmonicsg+1, &
        ' are precise. Others may be irrelevant.' 
     endif
-    if(.not.(EIm(1).lt.1.e6))then
-       write(*,*)'EIm NAN?',ncalc
-       write(*,*)EIm
+    if(.not.(abs(EIm(0)).gt.1.e-20))then   ! Insufficient test.
+       write(*,*)'EIm NAN/Zero?',nharmonicsg+1,Oceff,xit**2,EIm(1)
+       stop
     endif
 ! m=0 always used.! fy is Maxwellian.
 ! But the fywy,fy need to be fixed in inner routines.
     omegaonly=omegag
     call FgEint(Fpg(0),isigma)
 !    write(*,*)'SumHarmonicsg: Oceff,nharmonicsg=',Oceff,nharmonicsg !,hnum
-    if(lbess.and.nharmonicsg.gt.0)write(*,'(a,e11.4,''('',2e12.4,'')'',i4)')&
-         ' EI(0),Ftt(0)  =',EIm(0),Fpg(0),nharmonicsg
+    if(lbess.and.nharmonicsg.gt.0)write(*,'(a,e11.4,''('',2e12.4&
+         &,'')'',i4,f8.4)') ' EI(0),Ftt(0)  =',EIm(0),Fpg(0)&
+         &,nharmonicsg,Oceff
     Ftotalsumg=Fpg(0)*EIm(0)
     do m=1,nharmonicsg
        omegag=omegaonly+m*Oceff
@@ -600,32 +603,35 @@ include 'compareroutines.f90'
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 ! Routines that use shiftgen and are thus the interface.
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-subroutine ionforce(Fi,omega,omegaonlyp,Omegacin,psiin,vsin,isigma)
+subroutine ionforce(Fi,omega,kin,Omegacin,psiin,vsin,isigma)
 ! Input parameters are in electron units, and produce no permanent
 ! changes to shiftgen internal parameters.
   use shiftgen
-  complex :: Fi,omega,omegaonlyp,omg,omy
-  real :: psiin,vsin,Omegacin
-  omg=omegag;omy=omegaonly;omc=Omegacg;pg=psig;vs=vshift
+  complex :: Fi,omega,omg
+  real :: psiin,vsin,Omegacin,kin
+  kg=kin
+!  write(*,*)'ionforce kg=',kg
+  omg=omegag;omc=Omegacg;pg=psig;vs=vshift
   omegag=omega*sqrt(rmime)
   Omegacg=Omegacin*sqrt(rmime)
-  omegaonly=omegaonlyp*sqrt(rmime)
   psig=psiin
   vshift=vsin
   call SumHarmonicsg(isigma)
   Fi=Ftotalsumg
 ! Undo changes
-  omegag=omg;omegaonly=omg;Omegacg=omc;psig=pg;vshift=vs
+  omegag=omg;Omegacg=omc;psig=pg;vshift=vs
 end subroutine ionforce
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-subroutine electronforce(Felec,omegain,omegaonlyp,Omegacp,psiin,vsin,isigma)
+subroutine electronforce(Felec,omegain,kin,Omegacp,psiin,vsin,isigma)
 ! Inputs in electron units except for vsin in ion units. No permanent
 ! changes to shiftgen parameters. vshift is set temporarily to zero,
 ! and vrshift to ion shift vsin.
   use shiftgen
-  complex :: omegain,omegaonlyp,Felec
+  real :: kin
+  complex :: omegain,Felec
   omegag=omegain
-  omegaonly=omegaonlyp
+  kg=kin
+!  write(*,*)'electronforce kg=',kg
   Omegacg=Omegacp
   vr=vrshift
   vrshift=vsin   ! lioncorrect value

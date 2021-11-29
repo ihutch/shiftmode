@@ -333,7 +333,7 @@
 ! here has been specified in ion units.
           vs=vshift
 !          write(*,*)'ionforce call',omegag,rmime,psig,vs,isigma
-          call ionforce(fion(i),omegag/sqrt(rmime),omegag/sqrt(rmime),Omegacin,psig,vs,isigma)
+          call ionforce(fion(i),omegag/sqrt(rmime),0.,Omegacin,psig,vs,isigma)
           fion(i)=fion(i)/psig**2
           frcomplex(i)=frcomplex(i)/psig**2
           diffmax=max(diffmax,abs(fion(i)-frcomplex(i)))
@@ -399,14 +399,14 @@
        do i=1,nor
           or(i)=ormax*(i-.9)/(nor-.9)
           omegain=complex(oi,or(i))/sqrt(rmime)
-          call ionforce(fion(i),omegain,omegain,Omegacin,ps,vs,isigma)
+          call ionforce(fion(i),omegain,0.,Omegacin,ps,vs,isigma)
           fion(i)=fion(i)/ps**2
-          call ionforce(fion2(i),omegain,omegain,Omegacin,ps/10.,vs,isigma)
+          call ionforce(fion2(i),omegain,0.,Omegacin,ps/10.,vs,isigma)
           fion2(i)=fion2(i)/(ps/10.)**2
           if(j.eq.1)then
-             call electronforce(Fe,omegain,omegain,Omegacin,ps/10.,vs,isigma)
+             call electronforce(Fe,omegain,0.,Omegacin,ps/10.,vs,isigma)
              felec2(i)=Fe/(ps/10.)**2
-             call electronforce(Fe,omegain,omegain,Omegacin,ps,vs,isigma)
+             call electronforce(Fe,omegain,0.,Omegacin,ps,vs,isigma)
              felec(i)=Fe/ps**2
           endif
        enddo
@@ -542,14 +542,12 @@ subroutine plotionforce(psi,Typ,vsin)
   use shiftgen
   real :: psi,Typ,vsin
   integer, parameter :: nfi=100
-  complex :: omegaon
   complex, dimension(nfi) :: Fiarray,omegaFi
   omegamax=10
   write(*,*)'psi=',psi,' vsin=',vsin
   do i=1,nfi
      omegaFi(i)=omegamax*(float(i)/nfi)/sqrt(rmime)+complex(0.,.01)/sqrt(rmime)
-     omegaon=omegaFi(i)
-     call ionforce(Fiarray(i),omegaFi(i),omegaon,psi,vsin,isigma)
+     call ionforce(Fiarray(i),omegaFi(i),0.,psi,vsin,isigma)
      Fiarray(i)=Fiarray(i)/psi
   enddo
   call minmax(Fiarray,2*nfi,fmin,fmax)

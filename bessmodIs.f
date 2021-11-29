@@ -316,54 +316,58 @@ C-------------------------------------------------------------------
                   EMP2AL = (EM - ONE) + (ALPHA + ALPHA)
                   SUM = TEMPA * EMPAL * EMP2AL / EM
                   NEND = N - NB
+c        write(*,'(a,3i6,2g12.3)')'nend,n,nb,en,x',nend,n,nb,en,x
                   IF (NEND .LT. 0) THEN
 C-------------------------------------------------------------------
 C N .LT. NB, so store B(N) and set higher orders to zero.
 C-------------------------------------------------------------------
-                        B(N) = TEMPA
-                        NEND = -NEND
-                        DO 130 L = 1, NEND
-  130                      B(N+L) = ZERO
-                     ELSE
-                        IF (NEND .GT. 0) THEN
+                     B(N) = TEMPA
+                     NEND = -NEND
+                     DO 130 L = 1, NEND
+                        B(N+L) = ZERO
+ 130                 CONTINUE
+                  ELSE
+                     IF (NEND .GT. 0) THEN
 C-------------------------------------------------------------------
 C Recur backward via difference equation, calculating (but
 C not storing) B(N), until N = NB.
 C-------------------------------------------------------------------
-                           DO 140 L = 1, NEND
-                              N = N - 1
-                              EN = EN - TWO
-                              TEMPC = TEMPB
-                              TEMPB = TEMPA
-                              TEMPA = (EN*TEMPB) / X + TEMPC
-                              EM = EM - ONE
-                              EMP2AL = EMP2AL - ONE
-                              IF (N .EQ. 1) GO TO 150
-                              IF (N .EQ. 2) EMP2AL = ONE
-                              EMPAL = EMPAL - ONE
-                              SUM = (SUM + TEMPA*EMPAL) * EMP2AL / EM
-  140                      CONTINUE
-                        END IF
+                        DO 140 L = 1, NEND
+                           N = N - 1
+                           EN = EN - TWO
+                           TEMPC = TEMPB
+                           TEMPB = TEMPA
+                           TEMPA = (EN*TEMPB) / X + TEMPC
+c        write(*,*)l,x,tempc,tempa,en
+                           EM = EM - ONE
+                           EMP2AL = EMP2AL - ONE
+                           IF (N .EQ. 1) GO TO 150
+                           IF (N .EQ. 2) EMP2AL = ONE
+                           EMPAL = EMPAL - ONE
+                           SUM = (SUM + TEMPA*EMPAL) * EMP2AL / EM
+c           if(.not.1/sum.gt.0.)write(*,*)l,sum,em,tempa,tempb
+ 140                    CONTINUE
+                     END IF
 C-------------------------------------------------------------------
 C Store B(NB)
 C-------------------------------------------------------------------
-  150                   B(N) = TEMPA
-                        IF (NB .LE. 1) THEN
-                           SUM = (SUM + SUM) + TEMPA
-                           GO TO 230
-                        END IF
+ 150                 B(N) = TEMPA
+                     IF (NB .LE. 1) THEN
+                        SUM = (SUM + SUM) + TEMPA
+                        GO TO 230
+                     END IF
 C-------------------------------------------------------------------
 C Calculate and Store B(NB-1)
 C-------------------------------------------------------------------
-                        N = N - 1
-                        EN = EN - TWO
-                        B(N)  = (EN*TEMPA) / X + TEMPB
-                        IF (N .EQ. 1) GO TO 220
-                        EM = EM - ONE
-                        EMP2AL = EMP2AL - ONE
-                        IF (N .EQ. 2) EMP2AL = ONE
-                        EMPAL = EMPAL - ONE
-                        SUM = (SUM + B(N)*EMPAL) * EMP2AL / EM
+                     N = N - 1
+                     EN = EN - TWO
+                     B(N)  = (EN*TEMPA) / X + TEMPBb
+                     IF (N .EQ. 1) GO TO 220
+                     EM = EM - ONE
+                     EMP2AL = EMP2AL - ONE
+                     IF (N .EQ. 2) EMP2AL = ONE
+                     EMPAL = EMPAL - ONE
+                     SUM = (SUM + B(N)*EMPAL) * EMP2AL / EM
                   END IF
                   NEND = N - 2
                   IF (NEND .GT. 0) THEN
