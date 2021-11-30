@@ -8,6 +8,7 @@
 ! The variation of interest here is more about psip and vshift.
 
 program fomegasolve
+  use iterfind
   real :: kin,kmid
   logical :: lcont=.true.,lplot=.false.,lerase=.false.,lTiscan=.false.
   integer, parameter :: nk=1,noc=1,npsi=8,nvsin=21,nv0=0
@@ -72,7 +73,7 @@ program fomegasolve
            if(ip.eq.1)vsinarray(iv)=Ti
            omegap=complex(0.7*sqrt(psip)/8.,.7*sqrt(psip)/8./(1.+vsin))
            call Tset(1.,Ti)
-           call iterfindroot(psip,vs,Omegacp,omegap,kin,isigma,lplot,ires)
+           call iterfindroot(psip,vs,Omegacp,omegap,kin,isigma,ires)
            if(ires.ne.0)omegasolve(iv,ip)=omegap/sqrt(psip)
            write(*,'(3f8.4,i3,$)')psip,vs,Ti,ires
            write(*,*)omegap
@@ -126,7 +127,7 @@ program fomegasolve
            if(iv.eq.0)vsin=0.
            if(ip.eq.1)vsinarray(iv)=vsin
            omegap=complex(0.7*sqrt(psip)/8.,.7*sqrt(psip)/8./(1.+vsin))
-           call iterfindroot(psip,vsin,Omegacp,omegap,kin,isigma,lplot,ires)
+           call iterfindroot(psip,vsin,Omegacp,omegap,kin,isigma,ires)
            if(ires.ne.0)omegasolve(iv,ip)=omegap/sqrt(psip)
            write(*,'(2f8.4,i3,$)')psip,vsin,ires
            write(*,*)omegap
@@ -201,6 +202,7 @@ end subroutine parsefoarguments
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 subroutine fomegacont(psip,Omegacp,Typ,omegap,kin,vsin,lcont,lplot&
      &,err,ormax,oimax,lerase)
+  use iterfind
   logical :: lerase
   complex :: omegap      ! omegag surrogate maybe read from file
   integer, parameter ::   nor=21,noi=21
@@ -321,7 +323,13 @@ write(*,*)'fomegacont k=',kin
 ! Find root and plot it converging (omegag is set to found omegap implicitly)  
 !  omegap=complex(0.7*sqrt(psip)/8.,1.*sqrt(psip)/8./(1.+vsin))
   write(*,*)'calling iterfindroot',omegap,kin
-  call iterfindroot(psip,vsin,Omegacp,omegap,kin,isigma,lplot,ires)
+  call iterfindroot(psip,vsin,Omegacp,omegap,kin,isigma,ires)
+  if(ires.ne.0)then
+     do j=0,ires
+        call color(6)
+        call polymark(max(Frit(j),-2e-3),Fiit(j),1,ichar('0')+j)
+     enddo
+  endif
   write(*,*)'Eigenfrequency=',omegap
   if(lplot)     call pltend
   if(lplot3)then
@@ -385,123 +393,7 @@ write(*,*)'fomegacont k=',kin
   endif
 end subroutine fomegacont
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-subroutine iterfindroot(psip,vsin,Omegacp,omegap,kin,isigma,lplot,ires)
-  integer, parameter :: niter=12
-  real :: psip,vsin,Omegacp,kin
-  integer :: isigma,ires,nunconv=3
-  logical lplot
-  complex :: omegap,  Fec,Fic,Fsum
-  real, dimension(0:niter) :: Frit,Fiit
-     zoif=.001  ! Iteration minimum oi limit factor.
-     nzo=0
-     omegap=complex(0.9*sqrt(psip)/8.,.9*sqrt(psip)/8./(1.+vsin))
-     Frit(0)=max(real(omegap),-2e-3)
-     Fiit(0)=imag(omegap)
-     call electronforce(Fec,omegap,kin,Omegacp,psip,vsin,isigma)
-     ienharm=inharm()
-     call      ionforce(Fic,omegap,kin,Omegacp,psip,vsin,isigma)
-     iinharm=inharm()
-     FE=kin**2*psip**2*128./315.
-     Fsum=Fec+Fic+FE
-     err=0
-     do i=1,niter
-        if(lplot)write(*,'(a,3i3,5f9.6)')'i,nharm,omegap,Fsum,err=',i&
-             &-1,ienharm,iinharm,omegap,Fsum,err
-        ires=i
-        call complexnewton(Fsum,omegap,kin,err,psip,isigma,vsin,Omegacp)
-        Frit(i)=max(real(omegap),-2e-3)
-        Fiit(i)=imag(omegap)
-        if(.not.abs(omegap).lt.1.e6)write(*,*)'Iterfindroot',i,psip,vsin,omegap
-        if(imag(omegap).lt.zoif*sqrt(psip))then
-           nzo=nzo+1
-           if(nzo.ge.nunconv)then
-              if(lplot)write(*,'(a,i2,a,g10.3)')'Uncoverged after',nzo,'&
-                   & omegai less than',zoif*sqrt(psip)
-              err=1.
-              ires=0
-              goto 1
-           endif
-           omegap=complex(real(omegap),zoif*sqrt(psip))
-        endif
-        if(.not.abs(omegap).lt.1.e3)then
-           ires=0
-           write(*,*)'Iterfind diverging',omegap,err
-           goto 1
-        endif
-        call electronforce(Fec,omegap,kin,Omegacp,psip,vsin,isigma)
-        call      ionforce(Fic,omegap,kin,Omegacp,psip,vsin,isigma)
-        Fsum=Fec+Fic+FE
-!        write(*,*)err
-        if(err.lt..5e-4)goto 1
-        if(err*abs(omegap).lt.1.e-6)then
-           write(*,*)'Apparent convergence at low omegap'
-           goto 1
-        endif
-     enddo
-     i=i-1
-     if(lplot)write(*,*)'Unconverged after',i,' iterations'
-1    continue
-     if(lplot)then
-        write(*,'(a,3i3,5f9.6)')'i,nharm,omegap,Fsum,err=',i&
-             &,ienharm,iinharm,omegap,Fsum,err
-        if(err.ne.1.and.i.ne.niter)then
-           do j=0,i-1
-              call color(6)
-              call polymark(max(Frit(j),-2e-3),Fiit(j),1,ichar('0')+j)
-           enddo
-        endif
-     endif
-end subroutine iterfindroot
-!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-subroutine complexnewton(Fsum,omegap,kin,err,psip,isigma,vsin,Omegacp)
-  ! Take a Newton Step in finding the complex omega root of
-  ! complex force by inverting the 2x2 matrix from adjacent evaluations.
-  ! Return the Fsum,omegap,err new values.
-  complex :: Fsum,omegap
-  real :: err,psip,vsin,Omegacp,kin
-  real :: eps1=.05,J11,J12,J21,J22,domega1,domega2,det
-  complex :: om1,om2,om3,f1,f2,f3,domega,Fec,Fic
-  det=1.
-  FE=kin**2*psip**2*128./315.
-  f1=Fsum
-  om1=omegap
-  ! Calculate the Jacobian's coefficients.
-  om2=om1+eps1*abs(real(om1))
-!write(*,*)'compnewt call, kin=',kin
-  call electronforce(Fec,om2,kin,Omegacp,psip,vsin,isigma)
-  call      ionforce(Fic,om2,kin,Omegacp,psip,vsin,isigma)
-  f2=Fec+Fic+FE
-!  write(*,'(6g12.4)')om1,om2,f2
-  if(.not.om2-om1.ne.0)stop 'om2-om1=0'
-  J11=real(f2-f1)/real(om2-om1)
-  J21=imag(f2-f1)/real(om2-om1)
-  om3=om1+complex(0.,eps1*abs(imag(om1)))
-  call electronforce(Fec,om3,kin,Omegacp,psip,vsin,isigma)
-  call      ionforce(Fic,om3,kin,Omegacp,psip,vsin,isigma)
-  f3=Fec+Fic+FE
-!  write(*,'(6g12.4)')om1,om3,f3
-  if(.not.om3-om1.ne.0)stop 'om3-om1=0'
-  J12=real(f3-f1)/imag(om3-om1)
-  J22=imag(f3-f1)/imag(om3-om1)
-  ! Solve J domega = -f to find domega
-  det=J11*J22-J21*J12
-  if(det.eq.0)then
-     write(*,*)'Det=0'
-     write(*,*)om1,om2,om3,f1,f2,f3
-     write(*,'(2f10.4)')J11,J12,J21,J22
-     ! Try to recover.
-     det=1.
-  endif
-  domega1=-(J22*real(f1)-J12*imag(f1))/det
-  domega2=-(-J21*real(f1)+J11*imag(f1))/det
-!  write(*,*)J11*domega1+J12*domega2,J21*domega1+J22*domega2
-  domega=complex(domega1,domega2)
-  omegap=om1+domega
-!  err=abs(domega/omegap)
-  err=abs(domega/omegap)
-!  write(*,*)'domega1,domega2,omega',domega1,domega2,omega
-end subroutine complexnewton
-!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!include 'iterfindold.f90'  ! Obsolete
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 ! Plotting routines.
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
