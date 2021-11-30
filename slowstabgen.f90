@@ -37,6 +37,7 @@ program fomegasolve
      if(vsin.le.1.2)oimax=.3*sqrt(psip)
      if(vsin.le..9)oimax=.4*sqrt(psip)
   endif
+  omegap=complex(ormax,oimax)
   if(lplot)then
 ! contouring of psimax and vsmax case.       
      do ik=1,nk
@@ -262,26 +263,29 @@ write(*,*)'fomegacont k=',kin
 
   if(.not.lreadit.and.lcont)then    ! Failed to read from file so calculate
      ! Contruct the forcecomplex matrix
-        write(*,'(a)')'ior,  ioi  omegar omegai   Ftotalr  Ftotali     k nharm'
+        write(*,'(a)')'ior,  ioi  omegar omegai   Ftotalr  Ftotali     k   nharms'
         do ior=1,nor
            or(ior)=(ior-1)*ormax/(nor-1.)
            dioi=-0.04   ! Offset of oi(1) from zero.
            do ioi=1,noi
               oi(ioi)=(ioi-1+dioi)*oimax/(noi-1+dioi)
-              omegacomplex(ior,ioi)=complex(or(ior),oi(ioi))
+              omegap=complex(or(ior),oi(ioi))
+              omegacomplex(ior,ioi)=omegap
               call electronforce(Ftcomplex(ior,ioi),omegacomplex(ior&
                    &,ioi),kin,Omegacp,psip,vsin,isigma)
+              ienharm=inharm()
               if(lions)then
                  call ionforce(Fi,omegacomplex(ior,ioi) ,kin,Omegacp,&
                       & psip,vsin ,isigma)
+                 iinharm=inharm()
               endif
               Ficomplex(ior,ioi)=Fi
               forcecomplex(ior,ioi)=Ftcomplex(ior,ioi)+Fi+FE
-              write(*,'(2i4,2f8.4,2f10.6,f7.3,i4)')ior,ioi,omegacomplex(ior&
-                   &,ioi),forcecomplex(ior,ioi),kin,inharm()
+              write(*,'(2i4,2f8.4,2f10.6,f7.3,2i4)')ior,ioi,omegacomplex(ior&
+                   &,ioi),forcecomplex(ior,ioi),kin,ienharm,iinharm
            enddo 
         enddo
-        write(*,'(a)')'ior,  ioi  omegar omegai   Ftotalr  Ftotali     k nharm'
+        write(*,'(a)')'ior,  ioi  omegar omegai   Ftotalr  Ftotali     k   nharms'
         write(*,*)'Omegacp,k,psip',Omegacp,kin,psip
         
         ! Attempt to write but skip if file exists.
@@ -394,13 +398,15 @@ subroutine iterfindroot(psip,vsin,Omegacp,omegap,kin,isigma,lplot,ires)
      Frit(0)=max(real(omegap),-2e-3)
      Fiit(0)=imag(omegap)
      call electronforce(Fec,omegap,kin,Omegacp,psip,vsin,isigma)
+     ienharm=inharm()
      call      ionforce(Fic,omegap,kin,Omegacp,psip,vsin,isigma)
+     iinharm=inharm()
      FE=kin**2*psip**2*128./315.
      Fsum=Fec+Fic+FE
      err=0
      do i=1,niter
-        if(lplot)write(*,'(a,2i3,5f10.6)')'i,nharm,omegap,Fsum,err=',i&
-             &-1,inharm(),omegap,Fsum,err
+        if(lplot)write(*,'(a,3i3,5f9.6)')'i,nharm,omegap,Fsum,err=',i&
+             &-1,ienharm,iinharm,omegap,Fsum,err
         ires=i
         call complexnewton(Fsum,omegap,kin,err,psip,isigma,vsin,Omegacp)
         Frit(i)=max(real(omegap),-2e-3)
@@ -436,7 +442,8 @@ subroutine iterfindroot(psip,vsin,Omegacp,omegap,kin,isigma,lplot,ires)
      if(lplot)write(*,*)'Unconverged after',i,' iterations'
 1    continue
      if(lplot)then
-        write(*,'(a,i4,5f10.6)')'i,omegap,Fsum,err=',i,omegap,Fsum,err
+        write(*,'(a,3i3,5f9.6)')'i,nharm,omegap,Fsum,err=',i&
+             &,ienharm,iinharm,omegap,Fsum,err
         if(err.ne.1.and.i.ne.niter)then
            do j=0,i-1
               call color(6)

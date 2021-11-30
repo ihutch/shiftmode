@@ -430,8 +430,9 @@ contains
        write(*,'(a,i3,a,i3,a)')'Bessel functions',ncalc,' of',nharmonicsg+1, &
        ' are precise. Others may be irrelevant.' 
     endif
-    if(.not.(abs(EIm(0)).gt.1.e-20))then   ! Insufficient test.
-       write(*,*)'EIm NAN/Zero?',nharmonicsg+1,Oceff,xit**2,EIm(1)
+    if(.not.(abs(EIm(0)).gt.-1.e-20))then   ! Insufficient test.
+       write(*,*)'EIm NAN/Zero?',nharmonicsg+1,Oceff,xit**2,EIm(0)
+       write(*,*)ncalc,EIm(0:nharmonicsg)
        stop
     endif
 ! m=0 always used.! fy is Maxwellian.

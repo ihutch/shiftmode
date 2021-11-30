@@ -361,7 +361,7 @@ C Calculate and Store B(NB-1)
 C-------------------------------------------------------------------
                      N = N - 1
                      EN = EN - TWO
-                     B(N)  = (EN*TEMPA) / X + TEMPBb
+                     B(N)  = (EN*TEMPA) / X + TEMPB
                      IF (N .EQ. 1) GO TO 220
                      EM = EM - ONE
                      EMP2AL = EMP2AL - ONE

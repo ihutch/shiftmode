@@ -7,7 +7,7 @@ include ACCIS.mk
 #########################################################################
 LIBRARIES := $(LIBRARIES) -lmodbess
 LIBDEPS := $(LIBDEPS) libmodbess.a
-COMPILE-SWITCHES:=$(COMPILE-SWITCHES) -Wno-unused-dummy-argument -fopenmp
+COMPILE-SWITCHES:=$(COMPILE-SWITCHES) -Wno-unused-dummy-argument
 #########################################################################
 MODULES=shiftmode.o shiftgen.o acpath.o 
 #########################################################################
@@ -36,8 +36,13 @@ MODULES=shiftmode.o shiftgen.o acpath.o
 #########################################################################
 # A specific library of modified Bessel functions.
 libmodbess.a : bessmodIs.f
-	$(FORTRAN) -c bessmodIs.f
+	$(FORTRAN) -c $(COMPILE-SWITCHES) bessmodIs.f
 	ar -crs libmodbess.a bessmodIs.o
+
+altlibmodbess : toms715.f90
+	$(FORTRAN) -c $(COMPILE-SWITCHES) toms715.f90
+	ar -crs libmodbess.a toms715.o
+
 
 # An attempt to prevent repetitive module compilation.
 modules : $(MODULES)
