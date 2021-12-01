@@ -22,7 +22,7 @@ subroutine iterfindroot(psip,vsin,Omegacp,omegap,kp,isigma,nit)
      call      ionforce(Fic,omegap,kp,Omegacp,psip,vsin,isigma)
      iinharm=inharm()
      FE=kp**2*psip**2*128./315.
-     Fsum=Fec+Fic+FE
+     Fsum=Fec+Fic-FE
      err=0
      do i=1,niterfind
         write(*,'(a,3i3,5f9.6)')'i,nharm,omegap,Fsum,err=',i&
@@ -50,7 +50,7 @@ subroutine iterfindroot(psip,vsin,Omegacp,omegap,kp,isigma,nit)
         endif
         call electronforce(Fec,omegap,kp,Omegacp,psip,vsin,isigma)
         call      ionforce(Fic,omegap,kp,Omegacp,psip,vsin,isigma)
-        Fsum=Fec+Fic+FE
+        Fsum=Fec+Fic-FE
         if(err.lt..5e-4)goto 1
         if(err*abs(omegap).lt.1.e-6)then
            write(*,*)'Apparent convergence at low omegap'
@@ -82,7 +82,7 @@ subroutine complexnewton(Fsum,omegap,kp,err,psip,isigma,vsin,Omegacp)
 !write(*,*)'compnewt call, kp=',kp
   call electronforce(Fec,om2,kp,Omegacp,psip,vsin,isigma)
   call      ionforce(Fic,om2,kp,Omegacp,psip,vsin,isigma)
-  f2=Fec+Fic+FE
+  f2=Fec+Fic-FE
 !  write(*,'(6g12.4)')om1,om2,f2
   if(.not.om2-om1.ne.0)stop 'om2-om1=0'
   J11=real(f2-f1)/real(om2-om1)
@@ -90,7 +90,7 @@ subroutine complexnewton(Fsum,omegap,kp,err,psip,isigma,vsin,Omegacp)
   om3=om1+complex(0.,eps1*abs(imag(om1)))
   call electronforce(Fec,om3,kp,Omegacp,psip,vsin,isigma)
   call      ionforce(Fic,om3,kp,Omegacp,psip,vsin,isigma)
-  f3=Fec+Fic+FE
+  f3=Fec+Fic-FE
 !  write(*,'(6g12.4)')om1,om3,f3
   if(.not.om3-om1.ne.0)stop 'om3-om1=0'
   J12=real(f3-f1)/imag(om3-om1)
