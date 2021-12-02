@@ -20,10 +20,11 @@
 ! reference temperature, the default spatial extent is |zm|=10.
 ! But for energies near zero is sometimes automatically lengthened.
 
-! The force is the integral dz of -d\phi/dz times the non-adiabatic
-! perturbed f, which is an integral over the past time d\tau of the
-! orbit, integrated over velocity, using total (distant) density
-! of unity, and given (linearized) for a unit perturbing z-shift.
+! The force contribution is the integral dz of -d\phi/dz times the
+! non-adiabatic perturbed f, which is an integral over the past time
+! d\tau of the orbit, integrated over velocity, using total (distant)
+! density of unity, and given (linearized) for a unit perturbing
+! z-shift.
 
 ! Both space and past time integrals can be expressed as time
 ! integrals.  However, equal intervals of neither time nor space are
@@ -416,13 +417,18 @@ contains
 ! The maximum needed perp velocity, such that kg*vymax/Oc=nharmonicsg
     vymax=3.5*sqrt(2.*Tperpg)
     Oceff=max(1.e-6,max(Omegacg,kg*vymax/nhmax)) ! Don't allow zero Oceff.
-! How many harmonics do we actually need? Nominally:
-    hnum=kg*vymax/Oceff                          ! This will not exceed nhmax
-! If hnum is small, then use rather more for accuracy.
-    nharmonicsg=min(nhmax,int(hnum*(1.+3./(hnum+1.))))
     xit=kg*sqrt(Tperpg)/Oceff
-!     write(*,'(a,2f8.4,i3,4f7.3)')'kg,vymax,nharm,Oceff,Oc,xit,psig',kg&
-!          &,vymax,nharmonicsg,Oceff,Omegacg,xit,psig
+! How many harmonics do we actually need? For large hnum:
+    hnum=kg*vymax/Oceff                         ! This will not exceed nhmax
+! If hnum is small, then use rather more for accuracy.
+!    nharmonicsg=min(nhmax,int(hnum*(1.+3./(hnum+1.)))) ! Maybe inadequate.
+! Require the linear approx to Immin to be less than small.
+    nharmonicsg=nint(max(hnum,min(4.,alog(.01)/alog(xit/2.+1.e-12))))
+    if(nharmonicsg.gt.nhmax)then
+       write(*,'(a,2f8.4,i3,4f7.3)')'kg,vymax,nharm,Oceff,Oc&
+            &,xit,psig',kg ,vymax,nharmonicsg,Oceff,Omegacg,xit,psig
+       stop 'Incorrect nharmonics exceeds nhmax'
+    endif
 ! Calculate the Integer[0.] exp*I[2] Bessel functions 0 to nharmonicsg
     ncalc=0
     call RIBESL(xit**2,0.,nharmonicsg+1,2,EIm,ncalc)

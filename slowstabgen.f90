@@ -282,7 +282,7 @@ write(*,*)'fomegacont k=',kin
                  iinharm=inharm()
               endif
               Ficomplex(ior,ioi)=Fi
-              forcecomplex(ior,ioi)=Ftcomplex(ior,ioi)+Fi+FE
+              forcecomplex(ior,ioi)=Ftcomplex(ior,ioi)+Fi-FE
               write(*,'(2i4,2f8.4,2f10.6,f7.3,2i4)')ior,ioi,omegacomplex(ior&
                    &,ioi),forcecomplex(ior,ioi),kin,ienharm,iinharm
            enddo 
@@ -316,7 +316,7 @@ write(*,*)'fomegacont k=',kin
      if(FE.eq.0.)then
         call legendline(.1,.9,258,'!p!o~!o!qF/!Ay!@!u2!u')
      else
-        call legendline(.1,.9,258,'(!p!o~!o!qF+F!dE!d)/!Ay!@!u2!u')
+        call legendline(.1,.9,258,'(!p!o~!o!qF-F!dE!d)/!Ay!@!u2!u')
      endif
   endif
      
