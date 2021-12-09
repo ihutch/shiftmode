@@ -203,11 +203,13 @@ end subroutine parsefoarguments
 subroutine fomegacont(psip,Omegacp,Typ,omegap,kin,vsin,lcont,lplot&
      &,err,ormax,oimax,lerase)
   use iterfind
+  use mpiloops
   logical :: lerase
   complex :: omegap      ! omegag surrogate maybe read from file
-  integer, parameter ::   nor=21,noi=21
+  integer, parameter ::   nor=41,noi=41
   real :: or(nor),oi(noi),kin
   complex ::  omegacomplex(nor,noi),forcecomplex(nor,noi),Fi
+  integer :: ienharm,iinharm
   complex ::  Ftcomplex(nor,noi),Ficomplex(nor,noi)
   real, dimension(nor,noi) :: cworka
   integer :: icl
@@ -218,7 +220,10 @@ subroutine fomegacont(psip,Omegacp,Typ,omegap,kin,vsin,lcont,lplot&
   character*30 string,filename,argument
   real ormax,oimax
 
-write(*,*)'fomegacont k=',kin
+  nproc=1
+  id=0
+  call mpilprep(id,nproc)
+!  write(*,*)'fomegacont k=',kin
   ! Create filename in accordance with passed parameters
   write(filename,'(a,2i2.2,a,i3.3,a,i3.3,a,i3.3,a,i3.3,a)')   &
        'F',nor,noi, &
@@ -249,30 +254,40 @@ write(*,*)'fomegacont k=',kin
      read(12,end=100)lions
      close(12)
 100  lreadit=.true.
-     write(*,*)'Read forcecomplex from file ',filename
-  write(*,*)'kin=',kin,' omegap=',omegap
+     if(id.eq.0)write(*,*)'Read forcecomplex from file ',filename
+     if(id.eq.0)write(*,*)'kin=',kin,' omegap=',omegap
+     call mpilstopslaves
   else
-     write(*,*)'Overwriting forcecomplex file ',filename
+     if(id.eq.0)write(*,*)'Overwriting forcecomplex file ',filename
      close(12,status='delete')
   endif
   goto 102
-101 write(*,*)'Failed to open or read from file: ', filename
+101 if(id.eq.0)write(*,*)'Failed to open or read from file: ', filename
 102 continue
 
-  if(lplot)call plotfv(vsin)  
+
+  if(lplot.and.id.eq.0)call plotfv(vsin)  
   isigma=-1
   FE=kin**2*psip**2*128./315.
 
   if(.not.lreadit.and.lcont)then    ! Failed to read from file so calculate
+     impi=0
+     dioi=-0.04   ! Offset of oi(1) from zero.
+     call mpilprep(id,nproc)
      ! Contruct the forcecomplex matrix
-        write(*,'(a)')'ior,  ioi  omegar omegai   Ftotalr  Ftotali     k   nharms'
+     if(id.eq.0)write(*,'(a)')'ior,  ioi  omegar omegai   Ftotalr &
+          & Ftotali     k   nharms'
+     do ioi=1,noi
+        oi(ioi)=(ioi-1+dioi)*oimax/(noi-1+dioi)
         do ior=1,nor
            or(ior)=(ior-1)*ormax/(nor-1.)
-           dioi=-0.04   ! Offset of oi(1) from zero.
-           do ioi=1,noi
-              oi(ioi)=(ioi-1+dioi)*oimax/(noi-1+dioi)
-              omegap=complex(or(ior),oi(ioi))
-              omegacomplex(ior,ioi)=omegap
+           omegap=complex(or(ior),oi(ioi))
+           omegacomplex(ior,ioi)=omegap
+           
+           impi=impi+1
+           iactiv=mod(impi,nproc)  ! Decide the active rank process iactiv
+           if(iactiv.eq.id)then    ! If I am active I do the work needed ...
+              
               call electronforce(Ftcomplex(ior,ioi),omegacomplex(ior&
                    &,ioi),kin,Omegacp,psip,vsin,isigma)
               ienharm=inharm()
@@ -283,24 +298,35 @@ write(*,*)'fomegacont k=',kin
               endif
               Ficomplex(ior,ioi)=Fi
               forcecomplex(ior,ioi)=Ftcomplex(ior,ioi)+Fi-FE
-              write(*,'(2i4,2f8.4,2f10.6,f7.3,2i4)')ior,ioi,omegacomplex(ior&
-                   &,ioi),forcecomplex(ior,ioi),kin,ienharm,iinharm
-           enddo 
+!              write(*,'(2i4,2f8.4,2f10.6,f7.3,3i4)')ior,ioi,omegacomplex(ior&
+!                   &,ioi),forcecomplex(ior,ioi),kin,ienharm,iinharm,iactiv
+              
+           endif
+           call mpilcommscomplex(forcecomplex(ior,ioi),iactiv,1,impi)
+           call mpilcommscomplex(Ftcomplex(ior,ioi),iactiv,1,impi)
+           call mpilcommscomplex(Ficomplex(ior,ioi),iactiv,1,impi)
+! We probably don't need to pass ienharm etc.. Values remain what they
+! were last time master did the work.
+           if(id.eq.0)write(*,'(2i4,2f8.4,2f10.6,f7.3,2i4)')ior&
+                &,ioi,omegacomplex(ior ,ioi),forcecomplex(ior,ioi)&
+                &,kin,ienharm,iinharm
         enddo
-        write(*,'(a)')'ior,  ioi  omegar omegai   Ftotalr  Ftotali     k   nharms'
-        write(*,*)'Omegacp,k,psip',Omegacp,kin,psip
-        
+     enddo
+     call mpilstopslaves        ! Prevent slaves from continuing.
+     write(*,'(a)')'ior,  ioi  omegar omegai   Ftotalr  Ftotali     k   nharms'
+     write(*,*)'Omegacp,k,psip',Omegacp,kin,psip
+     
         ! Attempt to write but skip if file exists.
-        open(12,file=filename,status='new',form='unformatted',err=103)
-        write(*,*)'Opened new file: ',filename,' and writing'
-        write(12)nor,noi
-        write(12)or,oi
-        write(12)psip,Omegacp,Typ,omegap,kin,ormax,oimax
-        write(12)omegacomplex,forcecomplex,Ftcomplex,Ficomplex
-        write(12)lions
-        goto 104
-103     write(*,*)'New File: ',filename,' cannot be opened; not rewriting.'
-104     close(12)
+     open(12,file=filename,status='new',form='unformatted',err=103)
+     write(*,*)'Opened new file: ',filename,' and writing'
+     write(12)nor,noi
+     write(12)or,oi
+     write(12)psip,Omegacp,Typ,omegap,kin,ormax,oimax
+     write(12)omegacomplex,forcecomplex,Ftcomplex,Ficomplex
+     write(12)lions
+     goto 104
+103  write(*,*)'New File: ',filename,' cannot be opened; not rewriting.'
+104  close(12)
   endif
 
   write(*,*)'Omegacp/omegab=',2*Omegacp/sqrt(psip)

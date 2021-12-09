@@ -79,6 +79,7 @@ program osolvomk
   call color(4)
   call jdrwstr(wx2nx(oc(no)*.5),wy2ny(max(.05*omax,oi(no,1)+0.05&
        &*omax)),'imag',0.)
+  call winset(.true.)
   do j=1,nk
      call dashset(j-1)
      call color(1)

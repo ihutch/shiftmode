@@ -12,57 +12,58 @@ subroutine iterfindroot(psip,vsin,Omegacp,omegap,kp,isigma,nit)
   integer, intent(out) :: nit         ! zero is failure, else n-iterations.
   integer :: nunconv=3
   complex :: Fec,Fic,Fsum
-     zoif=.001  ! Iteration minimum oi limit factor.
-     nzo=0
-     omegap=complex(0.9*sqrt(psip)/8.,.9*sqrt(psip)/8./(1.+vsin))
-     Frit(0)=max(real(omegap),-2e-3)
-     Fiit(0)=imag(omegap)
-     call electronforce(Fec,omegap,kp,Omegacp,psip,vsin,isigma)
-     ienharm=inharm()
-     call      ionforce(Fic,omegap,kp,Omegacp,psip,vsin,isigma)
-     iinharm=inharm()
-     FE=kp**2*psip**2*128./315.
-     Fsum=Fec+Fic-FE
-     err=0
-     do i=1,niterfind
-        write(*,'(a,3i3,5f9.6)')'i,nharm,omegap,Fsum,err=',i&
-             &-1,ienharm,iinharm,omegap,Fsum,err
-        nit=i
-        call complexnewton(Fsum,omegap,kp,err,psip,isigma,vsin,Omegacp)
-        Frit(i)=max(real(omegap),-2e-3)
-        Fiit(i)=imag(omegap)
-        if(.not.abs(omegap).lt.1.e6)write(*,*)'Iterfindroot',i,psip,vsin,omegap
-        if(imag(omegap).lt.zoif*sqrt(psip))then
-           nzo=nzo+1
-           if(nzo.ge.nunconv)then
-              write(*,'(a,i2,a,g10.3)')'Uncoverged after',nzo,'&
-                   & omegai less than',zoif*sqrt(psip)
-              err=1.
-              nit=0
-              goto 1
-           endif
-           omegap=complex(real(omegap),zoif*sqrt(psip))
-        endif
-        if(.not.abs(omegap).lt.1.e3)then
-           write(*,*)'Iterfind diverging',omegap,err
+  logical :: litw=.false.
+  zoif=.001  ! Iteration minimum oi limit factor.
+  nzo=0
+  omegap=complex(0.9*sqrt(psip)/8.,.9*sqrt(psip)/8./(1.+vsin))
+  Frit(0)=max(real(omegap),-2e-3)
+  Fiit(0)=imag(omegap)
+  call electronforce(Fec,omegap,kp,Omegacp,psip,vsin,isigma)
+  ienharm=inharm()
+  call      ionforce(Fic,omegap,kp,Omegacp,psip,vsin,isigma)
+  iinharm=inharm()
+  FE=kp**2*psip**2*128./315.
+  Fsum=Fec+Fic-FE
+  err=0
+  do i=1,niterfind
+     if(litw)write(*,'(a,3i3,5f9.6)')'i,nharm,omegap,Fsum,err=',i&
+          &-1,ienharm,iinharm,omegap,Fsum,err
+     nit=i
+     call complexnewton(Fsum,omegap,kp,err,psip,isigma,vsin,Omegacp)
+     Frit(i)=max(real(omegap),-2e-3)
+     Fiit(i)=imag(omegap)
+     if(.not.abs(omegap).lt.1.e6)write(*,*)'Iterfindroot',i,psip,vsin,omegap
+     if(imag(omegap).lt.zoif*sqrt(psip))then
+        nzo=nzo+1
+        if(nzo.ge.nunconv)then
+           write(*,'(a,i2,a,g10.3)')'Uncoverged after',nzo,'&
+                & omegai less than',zoif*sqrt(psip)
+           err=1.
            nit=0
            goto 1
         endif
-        call electronforce(Fec,omegap,kp,Omegacp,psip,vsin,isigma)
-        call      ionforce(Fic,omegap,kp,Omegacp,psip,vsin,isigma)
-        Fsum=Fec+Fic-FE
-        if(err.lt..5e-4)goto 1
-        if(err*abs(omegap).lt.1.e-6)then
-           write(*,*)'Apparent convergence at low omegap'
-           goto 1
-        endif
-     enddo
-     nit=0
-     i=i-1
-     write(*,*)'Unconverged after',i,' iterations'
-1    continue
-     write(*,'(a,3i3,5f9.6)')'i,nharm,omegap,Fsum,err=',i&
-             &,ienharm,iinharm,omegap,Fsum,err
+        omegap=complex(real(omegap),zoif*sqrt(psip))
+     endif
+     if(.not.abs(omegap).lt.1.e3)then
+        write(*,*)'Iterfind diverging',omegap,err
+        nit=0
+        goto 1
+     endif
+     call electronforce(Fec,omegap,kp,Omegacp,psip,vsin,isigma)
+     call      ionforce(Fic,omegap,kp,Omegacp,psip,vsin,isigma)
+     Fsum=Fec+Fic-FE
+     if(err.lt..5e-4)goto 1
+     if(err*abs(omegap).lt.1.e-6)then
+        write(*,*)'Apparent convergence at low omegap'
+        goto 1
+     endif
+  enddo
+  nit=0
+  i=i-1
+  write(*,*)'Unconverged after',i,' iterations'
+1 continue
+  if(litw)write(*,'(a,3i3,5f9.6)')'i,nharm,omegap,Fsum,err=',i&
+       &,ienharm,iinharm,omegap,Fsum,err
 end subroutine iterfindroot
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 subroutine complexnewton(Fsum,omegap,kp,err,psip,isigma,vsin,Omegacp)

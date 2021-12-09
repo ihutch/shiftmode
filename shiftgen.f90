@@ -421,7 +421,7 @@ contains
 ! How many harmonics do we actually need? For large hnum:
     hnum=kg*vymax/Oceff                         ! This will not exceed nhmax
 ! If hnum is small, then use rather more for accuracy.
-!    nharmonicsg=min(nhmax,int(hnum*(1.+3./(hnum+1.)))) ! Maybe inadequate.
+!    nharmonicsg=min(nhmax,int(hnum*(1.+3./(hnum+1.)))) ! Inadequate.
 ! Require the linear approx to Immin to be less than small.
     nharmonicsg=nint(max(hnum,min(4.,alog(.01)/alog(xit/2.+1.e-12))))
     if(nharmonicsg.gt.nhmax)then
