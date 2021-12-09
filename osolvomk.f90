@@ -2,6 +2,7 @@
 ! and specified psi.
 program osolvomk
   use iterfind
+  use mpiloops
   integer, parameter :: nomax=100,nkmax=20
   real, dimension(nomax,nkmax) :: or,oi
   real, dimension(nomax) :: oc
@@ -13,7 +14,7 @@ program osolvomk
   real :: kp=.1,psip=0.09,Ocmax=2.,vs=1.
 
   call parseos(psip,vs,kp,Ocmax,no,nk)
-  
+  call mpilprep(id,nproc)
   write(filename,'(a,2i2.2,a,i3.3,a,i3.3,a,i3.3,a,i3.3,a)')   &
        'F',no,nk, &
        'B',min(999,abs(nint(100*Ocmax))),   &
@@ -21,7 +22,8 @@ program osolvomk
        'v',min(999,abs(nint(100*vs))),  &
        'p',min(999,abs(nint(100*psip))),'.omk'
 
-  write(*,'(a,$)')'Attempt opening  '//filename(1:lentrim(filename))//' '
+  if(id.eq.0)write(*,'(a,$)')'Attempt opening  '&
+       &//filename(1:lentrim(filename))//' '
   open(12,file=filename,status='old',err=1)
   read(12,*)nof,ncol,nkf
   if(nof.ne.no.or.nkf.ne.nk)goto 1
@@ -30,29 +32,40 @@ program osolvomk
   enddo
   read(12,*)(kparray(j),j=1,nk)
   close(12)
+  call mpilstopslaves
   write(*,*)' Succeeded.'
   goto 2        ! Just plot the read-in data.
 1  continue     ! No or bad old file. Calculate and save.
   close(12,status='delete')
-  write(*,*)'  Failed. Calculating ...'
+  if(id.eq.0)write(*,*)'  Failed. Calculating ...'
 
+  impi=0
   oi=0;or=0.
   do j=1,nk
      kparray(j)=kp*j/nk
      thek=kparray(j)*sqrt(psip)
-  do i=1,no
-     if(j.eq.1)oc(i)=Ocmax*(i-.7)/(no-.7)
-     Omegacp=sqrt(psip)*oc(i)
-     write(*,'(a,f8.4,a,f8.4,a)')'Find for Omegac=',oc(i),' k=',kparray(j)
-     call iterfindroot(psip,vs,Omegacp,omegap,thek,isigma,nit)
-     write(*,*)omegap,nit
-     if(nit.gt.1.and.nit.le.niterfind)then
-        or(i,j)=real(omegap)/sqrt(psip)
-        oi(i,j)=imag(omegap)/sqrt(psip)
-     endif
+     do i=1,no
+        if(j.eq.1)oc(i)=Ocmax*(i-.7)/(no-.7)
+        Omegacp=sqrt(psip)*oc(i)
+        impi=impi+1
+        iactiv=mod(impi,nproc)
+        if(iactiv.eq.id)then
+!           write(*,'(a,f8.4,a,f8.4,a,i4)')'Find for Omegac=',oc(i),' k='&
+!                &,kparray(j),' id=',id
+           call iterfindroot(psip,vs,Omegacp,omegap,thek,isigma,nit)
+           if(nit.gt.1.and.nit.le.niterfind)then
+              or(i,j)=real(omegap)/sqrt(psip)
+              oi(i,j)=imag(omegap)/sqrt(psip)
+              write(*,'(a,2i3,a,f8.4,a,f8.4,a,f8.4,a,f8.4,a&
+                &,i3)')'Found:',i,j,' Oc=' ,oc(i),' k=',kparray(j),'&
+                & or=',or(i,j),' oi=',oi(i ,j),' id=',id
+           endif
+        endif
+        call mpilcommsreal(or(i,j),iactiv,1,impi)
+        call mpilcommsreal(oi(i,j),iactiv,1,impi)
+     enddo
   enddo
-  enddo
-  
+  call mpilstopslaves
   open(12,file=filename,status='new')
   write(12,*)no,2*nk,nk
   do i=1,no
