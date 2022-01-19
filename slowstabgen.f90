@@ -13,6 +13,7 @@ program fomegasolve
   logical :: lcont=.true.,lplot=.false.,lerase=.false.,lTiscan=.false.
   integer, parameter :: nk=1,noc=1,npsi=8,nvsin=21,nv0=0
   real :: Omegacarr(noc),karr(nk),psiparray(npsi),vsinarray(nv0:nvsin)
+  real :: Tiarray(nvsin)
   real :: ormax,oimax
   complex :: omegasolve(nv0:nvsin,npsi),omegap
   character*30 string
@@ -67,10 +68,10 @@ program fomegasolve
      write(*,*)' psip   vshift   Ti    it     omega'
      do ip=1,nvs ! Really this is vs iterations here
         vs=vsin*(ip-1)/(nvs-1.)
-        psiparray(ip)=vs
+        vsinarray(ip)=vs
         do iv=1,nvsin  ! Really this is Ti iterations
            Ti=Timin+(Timax-Timin)*(iv-1.)/(nvsin-.99999)
-           if(ip.eq.1)vsinarray(iv)=Ti
+           if(ip.eq.1)Tiarray(iv)=Ti
            omegap=complex(0.7*sqrt(psip)/8.,.7*sqrt(psip)/8./(1.+vsin))
            call Tset(1.,Ti)
            call iterfindroot(psip,vs,Omegacp,omegap,kin,isigma,ires)
@@ -79,7 +80,7 @@ program fomegasolve
            write(*,*)omegap
         enddo
      enddo
-     call pltinit(vsinarray(1),vsinarray(nvsin),0.,.3+psip)
+     call pltinit(Tiarray(1),Tiarray(nvsin),0.,.3+psip)
      call charsize(.019,.019)
      call axis; call axis2
      call axlabels('T!di!d','!Aw!@/!Ay!@!u1/2!u')
@@ -88,18 +89,16 @@ program fomegasolve
      iline=1
      do ip=1,nvs
         call color(ip)
-!        call polyline(vsinarray(1),imag(omegasolve(nvsin,ip))&
-!             &*(vsinarray(nvsin)/vsinarray(1:nvsin)),nvsin)
-        call fwrite(psiparray(ip),iwidth,2,string)
+        call fwrite(vsinarray(ip),iwidth,2,string)
         call dashset(2*ip-2)
-        call polyline(vsinarray(1),real(omegasolve(1:,ip)),nvsin)
+        call polyline(Tiarray(1),real(omegasolve(1:,ip)),nvsin)
         if(real(omegasolve(1,ip)).gt.0.001)then
            call legendline(.5,.95-.05*iline,0,' '//string(1:iwidth)&
                 &//' !Aw!@!dr!d')
            iline=iline+1
         endif
         call dashset(2*ip-1)
-        call polyline(vsinarray(1),imag(omegasolve(1:,ip)),nvsin)
+        call polyline(Tiarray(1),imag(omegasolve(1:,ip)),nvsin)
         call legendline(.5,.95-.05*iline,0,' '//string(1:iwidth)//' !Aw!@!di!d')
         iline=iline+1
         call dashset(0)

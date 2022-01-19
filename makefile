@@ -5,6 +5,12 @@
 # Decide the FORTRAN compiler and create the accis graphics routines:
 include ACCIS.mk
 #########################################################################
+ifneq ("$(FORTRAN)","mpif90")
+BLAH:=\
+$(shell echo "WARNING Compiler $(FORTRAN) probably not MPI-capable.">&2;\
+echo "May need to substitute mpiloops->mpiloopsdummy to compile." >&2;)
+endif
+#########################################################################
 LIBRARIES := $(LIBRARIES) -lmodbess
 LIBDEPS := $(LIBDEPS) libmodbess.a
 COMPILE-SWITCHES:=$(COMPILE-SWITCHES) -Wno-unused-dummy-argument
