@@ -252,7 +252,7 @@
     write(*,*)'R(Ftotalg)/psi^2  ',real(Ftotalg)/psig**2,-.14776,-0.5*.14776
     call multiframe(1,2,0)
     call minmax(forcegp,2*nge,pmin,pmax)
-    call minmax(forcegr,2*nge,rmin,rmax)
+    call minmax(Forcegr,2*nge,rmin,rmax)
     fpfac=max(5.*int(min(abs(rmax/pmax),abs(rmin/pmin))/5.),1.)
     call fwrite(fpfac,iwidth,0,ffan)
     call pltinit(vinfarrayr(nge),vinfarrayr(1)*1.01,min(pmin,rmin),max(pmax,rmax))
@@ -264,11 +264,11 @@
     call polymark(vinfarrayr,(max(pmax,rmax)*.97+vinfarray*1.e-7),nge&
          &,ichar('|'))
     call color(1)
-    call polyline(vinfarrayr,real(forcegr),nge)
+    call polyline(vinfarrayr,real(Forcegr),nge)
     call legendline(.05,.1,0,' real')
     call color(2)
     call dashset(2)
-    call polyline(vinfarrayr,imag(forcegr),nge)
+    call polyline(vinfarrayr,imag(Forcegr),nge)
     call legendline(.05,.05,0,' imag')
     call color(15)
     call dashset(0)

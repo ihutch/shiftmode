@@ -4,7 +4,7 @@ program dFtdWs
   use shiftmode
   implicit none
 
-  integer, parameter :: nomegad=1
+  integer, parameter :: nomegad=9
 
   complex :: Ft(ne,nomegad),Fomega(nomegad),Fbroad
   integer :: j,iwidth,ip0,lentrim,ip1,i
@@ -13,13 +13,14 @@ program dFtdWs
   real :: bestfit(ne)
   character*30 string
   character*20 wvar
-  logical :: limag=.true.
+  logical :: limag=.false.
   real :: pwr,cw,zB,fd,fn
   real :: plotx(ne),ploty(ne)
   
   psi=.16
   omegarmax=(nomegad/max(nomegad-1.,1.))*sqrt(psi)/2.    *.1
-  omegai=.0002
+  omegarmax=.225
+  omegai=.001
   call initialize
 
   write(*,*)'case, omegar,   omegai,     Ftr       Fti    Fbroadr  Fbroadi  '

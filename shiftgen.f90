@@ -293,7 +293,6 @@ contains
                (Forcegarray(i)*(omegag*dfe-omegadiff*dfeperp) &
                +Forcegarray(i-1)*(omegag*dfepre-omegadiff*dfeperppre))
        endif
-!       Forcegr(i)=Forcegarray(i)*omegag*dfdWpar(vinfarrayr(i),fvinf)
        Forcegr(i)=Forcegarray(i)*(omegag*dfe-omegadiff*dfeperp)
        tbr(i)=taug(ngz)
        dfepre=dfe
@@ -342,7 +341,6 @@ contains
 ! Calculate the force dFdvpsi for this vpsi and dvy element for one transit:
        call Fdirect(Wgarray(i),isigma,dFdvpsig)
        Forcegarray(i)=dFdvpsig
-       Forcegr(i)=Forcegarray(i)*(omegag*dfe-omegadiff*dfeperp)
        omegabg(i)=2.*pig/(2.*taug(ngz))
        call pathshiftg(i,obi)
        omegabg(i)=omegabg(i)+sqm1g*obi
@@ -364,6 +362,7 @@ contains
        endif
 ! Then divide by the resonance denominator multiply by complex dvpsi and sum.
        Ftrapg(i)=0.5*(Fnonresg(i)/resdenom + Fnonresg(i-1)/resdprev)*cdvpsi
+       Forcegr(i)=Ftrapg(i)/cdvpsi
     ! Now Ftrapg(i) is a quantity when simply summed over all ne positions
     ! and multiplied by 2 gives the total force. 
        if(.not.(abs(Ftrapg(i)).ge.0))then
