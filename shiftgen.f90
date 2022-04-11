@@ -341,6 +341,7 @@ contains
 ! Calculate the force dFdvpsi for this vpsi and dvy element for one transit:
        call Fdirect(Wgarray(i),isigma,dFdvpsig)
        Forcegarray(i)=dFdvpsig
+!       Forcegr(i)=Forcegarray(i)*(omegag*dfe-omegadiff*dfeperp)
        omegabg(i)=2.*pig/(2.*taug(ngz))
        call pathshiftg(i,obi)
        omegabg(i)=omegabg(i)+sqm1g*obi

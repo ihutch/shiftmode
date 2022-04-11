@@ -273,19 +273,19 @@ subroutine fomegacont(psip,Omegacp,Typ,kp,vsin,lcont,lplot,err,omegap&
   
 end subroutine fomegacont
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-subroutine ionforce(Fi,omega,psiin,vsin)
-  use shiftgen
-  complex :: Fi,omega,Ftotalg
-  real :: psiin,vsin
-  real, parameter :: mime=1836
-  omegag=omega*sqrt(mime)
-  omegaonly=omegag
-  psig=psiin
-  isigma=-1
-  vshift=vsin
-  call FgRepelEint(Ftotalg,isigma)
-  Fi=2.*Ftotalg
-end subroutine ionforce
+!subroutine ionforce(Fi,omega,psiin,vsin)
+!  use shiftgen
+!  complex :: Fi,omega,Ftotalg
+!  real :: psiin,vsin
+!  real, parameter :: mime=1836
+!  omegag=omega*sqrt(mime)
+!  omegaonly=omegag
+!  psig=psiin
+!  isigma=-1
+!  vshift=vsin
+!  call FgRepelEint(Ftotalg,isigma)
+!  Fi=2.*Ftotalg
+!end subroutine ionforce
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 subroutine lplot1(or,oi,nor,noi,vsin,omegac,psi,forcecomplex)
   real :: or(nor),oi(noi)
