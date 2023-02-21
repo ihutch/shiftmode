@@ -228,7 +228,7 @@ subroutine fomegacont(psip,Omegacp,Typ,kp,vsin,lcont,lplot,err,omegap&
      write(*,'(a,i4,5f10.6)')'i,omega,Fsum,err=',i+1,omega,Fsum,err
      if(err.lt..5e-4)exit
   enddo
-  if(lplot.and.nzo.lt.2)call polymark(real(omega),imag(omega),1,'@')
+  if(lplot.and.nzo.lt.2)call polymark(real(omega),imag(omega),1,ichar('@'))
   endif
   if(lplot)call pltend()
   omegap=omega
@@ -351,7 +351,7 @@ end subroutine orealplot
 subroutine ocomplot(or,nor,vsin,omegac,psi,ocomforce)
   real ::  or(nor)
   complex ::  ocomforce(nor)
-  call minmax(ocomforce,2*nor,fmin,fmax)
+  call minmax([real(ocomforce),imag(ocomforce)],2*nor,fmin,fmax)
   call pltinit(0.,or(nor),fmin,fmax)
   call axis; call axis2
   call axlabels('real(!Aw!@)','Force')
@@ -420,7 +420,7 @@ subroutine plotionforce(psi,Typ,vsin)
      omegaFi(i)=omegamax*(float(i)/nfi)/sqrt(1836.)+complex(0.,.0001)
      call ionforce(Fiarray(i),omegaFi(i),psi,vsin)
   enddo
-  call minmax(Fiarray,2*nfi,fmin,fmax)
+  call minmax([real(Fiarray),imag(Fiarray)],2*nfi,fmin,fmax)
   call pltinit(0.,omegamax/sqrt(1836.),fmin,fmax)
   call axis
   call axlabels('omega','Fi')

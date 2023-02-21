@@ -49,8 +49,8 @@ program main
         string='!BT!dy!d='
         call fwrite(Ty,width,2,string(10:))
         call legendline(.1,yg,257,string)
-        call polyline((/0.,.1/)*pkmax,(/0.,.1/)*pgmax*pkmax,2)
-        call polyline((/0.,.1/)*pkmax,(.0625,.0625),2)
+        call polyline([0.,.1]*pkmax,[0.,.1]*pgmax*pkmax,2)
+        call polyline([0.,.1]*pkmax,[.0625,.0625],2)
      endif
      ! k-scan
      akmax=0.3*sqrt(psi)/sqrt(Ty)
@@ -109,25 +109,6 @@ program main
   enddo
 !  call drcstr('1/16')
   call pltend()
-
-!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  stop
-  call pfset(3)
-  call pltinit(0.,np*psistep,-np*psistep*1.3,np*psistep*4.)
-  call axis
-  call axlabels('!Ay!@','Force !BF!dt!d , F!dp!d!@ (/!Aw!@!u2!u)')
-  do ik=1,nk
-     call polyline(psinp,Ftnp(:,ik),np)
-     call polyline(psinp,Fpnp(:,ik),np)
-     if(ik.eq.1)then
-        call jdrwstr(wx2nx(psinp(np/2+1)),wy2ny(Ftnp(np/2+1,ik)),'Trapped',-1.)
-     elseif(ik.eq.2)then
-        call jdrwstr(wx2nx(psinp(np/2)+1),wy2ny(Fpnp(np/2+1,ik)),'Passing',-1.)
-     endif
-     call fwrite(kik(ik),iwdth,4,string)
-     call jdrwstr(wx2nx(psinp(2*np/3+1)),wy2ny(Ftnp(2*np/3+1,ik)),string,1.)
-  enddo
-
    
 end program main
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!

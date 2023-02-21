@@ -356,7 +356,7 @@
           call axptset(0.,0.)
           call ticrev
           call axlabels('real(!Aw!@)/!Aw!@!dpi!d','!p!o~!o!qF!di!d/!Ay!@!u2!u')
-          call polymark(ormax,Fimmobile,1,1)
+          call polymark([ormax],[Fimmobile],1,1)
        endif
        call color(mod(j-1,15)+1)
        call polyline(or,real(frcomplex),nor)
@@ -551,7 +551,7 @@ subroutine plotionforce(psi,Typ,vsin)
   write(*,*)'psi=',psi,' vsin=',vsin
   do i=1,nfi
      omegaFi(i)=omegamax*(float(i)/nfi)/sqrt(rmime)+complex(0.,.01)/sqrt(rmime)
-     call ionforce(Fiarray(i),omegaFi(i),0.,psi,vsin,isigma)
+     call ionforce(Fiarray(i),omegaFi(i),0.,10.,psi,vsin,isigma)
      Fiarray(i)=Fiarray(i)/psi
   enddo
   call minmax(Fiarray,2*nfi,fmin,fmax)

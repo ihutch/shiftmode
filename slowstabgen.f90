@@ -488,7 +488,7 @@ end subroutine orealplot
 subroutine ocomplot(or,nor,vsin,omegacp,psi,ocomforce)
   real ::  or(nor)
   complex ::  ocomforce(nor)
-  call minmax(ocomforce,2*nor,fmin,fmax)
+  call minmax([real(ocomforce),imag(ocomforce)],2*nor,fmin,fmax)
   call pltinit(0.,or(nor),fmin,fmax)
   call axis; call axis2
   call axlabels('real(!Aw!@)','Force')
@@ -502,7 +502,7 @@ end subroutine ocomplot
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 subroutine plotionforce(psi,Typ,vsin,Omegacin)
 ! Repurposed for Ftot and Fe.
-  real :: psi,Typ,vsin
+  real :: psi,Typ,vsin,kin
   integer, parameter :: nfi=100
   complex, dimension(nfi) :: Ftotarray,Fiarray,Fearray,omegaFi
   omegamax=3.
@@ -513,8 +513,8 @@ subroutine plotionforce(psi,Typ,vsin,Omegacin)
      call electronforce(Fearray(i),omegaFi(i),kin,Omegacin,psi,vsin,-1)
      Ftotarray(i)=Fearray(i)+Fiarray(i)
   enddo
-  call minmax(Ftotarray,2*nfi,fmin,fmax)
-  call pltinit(0.,omegaFi(nfi),fmin,fmax)
+  call minmax([real(Ftotarray),imag(Ftotarray)],2*nfi,fmin,fmax)
+  call pltinit(0.,real(omegaFi(nfi)),fmin,fmax)
   call axis; call axis2
   call axlabels('omega','Ftot, Fe')
   call color(1)
